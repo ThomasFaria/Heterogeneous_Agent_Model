@@ -1,4 +1,4 @@
-name = "Heteregenous_Agent_Model"
+name = "Heterogenous_Agent_Model"
 uuid = "599d85dc-d1f6-4f2a-bb18-2021950229ab"
 authors = ["tfaria <thomas.faria@ensae.fr> and contributors"]
 version = "0.1.0"

@@ -1,4 +1,4 @@
-module Heteregenous_Agent_Model
+module Heterogenous_Agent_Model
 
 using LinearAlgebra, Statistics, Interpolations, Optim, ProgressBars, Printf
 

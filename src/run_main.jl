@@ -1,4 +1,4 @@
-using Heteregenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots
+using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots
 
 Params = @with_kw (
                     r = 0.04, # interest rate
