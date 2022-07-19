@@ -2,7 +2,7 @@ module Heterogenous_Agent_Model
 
 using LinearAlgebra, Statistics, Interpolations, Optim, ProgressBars, Printf
 
-function state_transition(z_next, skill_next, age_next, z, skill, age, Model)
+function state_transition(z_next::Float64, skill_next::Float64, age_next::Int64, z::Float64, skill::Float64, age::Float64, Model)
     (; z_chain, skill_chain, age_chain) = Model
 
     # Get the index of the current/next idiosync shock in the transition matrix
@@ -23,17 +23,17 @@ function state_transition(z_next, skill_next, age_next, z, skill, age, Model)
 end
 export state_transition
 
-function a_transition(a, c, w, z, Model)
+function a_transition(a::Float64, c::Float64, z::Float64, w::Float64, Model)
     (; r) = Model
     a_next = (1 + r) * a + w * z - c 
     return a_next
 end
 export a_transition
 
-function eval_value_function(V, C, Model)
-    (; r, β, z_chain, skill_chain, age_chain, a_vals, n, s_vals, u, U) = Model
+function eval_value_function(V::Vector{Float64}, C::Vector{Float64}, Model)
+    (; β, z_chain, skill_chain, age_chain, a_vals, n, s_vals, u, U) = Model
     Tv = zeros(n)
-    for s_i in 1:n
+    Threads.@threads for s_i in 1:n
         # Get the value of the asset for a given state
         a = s_vals[s_i, 1]
         # Get the value of the idiosync shock for a given state
@@ -45,7 +45,7 @@ function eval_value_function(V, C, Model)
         # Get the value of consumption for a given state
         c = C[s_i]
         # Deduce the asset for the following state with the transition rule
-        a_next = a_transition(a, c, w, z, Model)
+        a_next = a_transition(a, c, z, w, Model)
         # Initialise the expectation
         Ev_new = 0
         for z_next ∈ z_chain.state_values
@@ -71,7 +71,7 @@ function eval_value_function(V, C, Model)
 end
 export eval_value_function
 
-function obj(V, a_new, a, z, w, age, Model)
+function obj(V::Vector{Float64}, a_new, a::Float64, z::Float64, w::Float64, age::Float64, Model)
     (;z_chain, skill_chain, age_chain, s_vals, a_vals, r, β, u, U) = Model
     # Initialise the expectation
     Ev_new = 0
@@ -98,13 +98,13 @@ function obj(V, a_new, a, z, w, age, Model)
 end
 export obj
 
-function bellman_update(V, Model)
-    (; r, a_min, n, s_vals, ϵ) = Model
+function bellman_update(V::Vector{Float64}, Model)
+    (; r, n, s_vals, ϵ) = Model
     
     Tv = zeros(n)
-    C = ones(n)*a_min
+    C = zeros(n)
     # Loop through the different states
-    Threads.@threads for s_i in 1:n
+    for s_i in 1:n
         # Get the value of the asset for a given state
         a = s_vals[s_i, 1]
         # Get the value of the idiosync shock for a given state
@@ -113,8 +113,6 @@ function bellman_update(V, Model)
         w = s_vals[s_i, 3]
         # Get the age for a given state
         age = s_vals[s_i, 4]
-        # Get the value of consumption for a given state
-        c = C[s_i]
 
         # Specify lower bound for optimisation
         lb = zeros(1) .+ ϵ        
@@ -128,16 +126,22 @@ function bellman_update(V, Model)
         a_new = Optim.minimizer(Sol)[1]
 
         # Deduce optimal value function and consumption
-        Tv[s_i] = obj(V, a_new, a, z, w, age, Model) 
-        C[s_i] =  a * (1+r) + z * w - a_new
-
+        c = w * z + (1 + r) * a - a_new
+        if c > 0
+            C[s_i] = c
+            Tv[s_i] = obj(V, a_new, a, z, w, age, Model) 
+        else
+            C[s_i] = 0
+            a_new = w * z + (1 + r) * a
+            Tv[s_i] = obj(V, a_new, a, z, w, age, Model) 
+        end
     end
     return (Tv=Tv, C=C)
 
 end
 export bellman_update
 
-function solve_PFI(Model; maxit=300, η_tol=1e-8, verbose=false)
+function solve_PFI(Model; maxit=300, η_tol=1e-5, verbose=false)
     (;n) = Model
 
     # Initialize the value function
@@ -168,9 +172,54 @@ function solve_PFI(Model; maxit=300, η_tol=1e-8, verbose=false)
             println("\n Algorithm stopped after iteration ", n, ", with μ = ", λ, "\n")
             return (V=V, C=Bellman.C)
         end
-        set_postfix(iter, η=@sprintf("%.8f", η))
+        set_postfix(iter, η=@sprintf("%.8f", η), λ=@sprintf("%.8f", λ))
     end
 end
 export solve_PFI
+
+function simulate_model(dr::Vector{Float64}, Model; N=1, a0=0.5, T=1000)
+    (; z_chain, skill_chain, age_chain, s_vals, a_size) = Model
+
+    sim = zeros(N, T, 5)
+    a_init = a0
+    for n ∈ ProgressBar(1:N)
+        Z = simulate(z_chain, T+1)
+        W = simulate(skill_chain, T+1)
+        AGE = simulate(age_chain, T+1, init = 1)
+    
+        z0 = Z[1]
+        w0 = W[1]
+        age0 = AGE[1]
+        a0 = a_init
+        for t ∈ 1:T
+            C = dr[(s_vals[:,2] .== z0) .&& 
+                    (s_vals[:,3] .== w0) .&& 
+                    (s_vals[:,4] .== age0)
+                    ]
+
+            c0 = C[argmin(abs.(s_vals[1:a_size,1] .- a0))]
+            sim[n, t, : ] = [a0, z0, w0, age0, c0]
+
+            a0 = a_transition(a0, c0, z0, w0, Model)
+            z0 = Z[t+1]
+            w0 = W[t+1]
+            age0 = AGE[t+1]
+        end
+    end
+    return sim 
+end
+export simulate_model
+
+function get_asset_from_dr(dr::Vector{Float64}, Model)
+    (;s_vals, r) = Model
+
+    W = s_vals[:, 3]
+    Z = Model.s_vals[:, 2]
+    A = Model.s_vals[:, 1]
+    C = dr
+    return W .* Z + (1 + r) * A  - C
+
+end
+export get_asset_from_dr
 
 end
