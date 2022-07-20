@@ -10,7 +10,7 @@ curl -o julia.tar.gz "https://julialang-s3.julialang.org/bin/linux/x64/${JULIA_M
 
 sudo mkdir /opt/julia
 sudo tar xf julia.tar.gz --strip-components=1 -C /opt/julia
-
+ 
 sudo ln -s /opt/julia/bin/* /usr/local/bin
 
 rm -rf julia.tar.gz
