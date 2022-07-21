@@ -113,7 +113,7 @@ end
 export obj
 
 function bellman_update(V::Vector{Float64}, Model)
-    (; r, n, s_vals, ϵ) = Model
+    (; n, s_vals, ϵ) = Model
     
     Tv = zeros(n)
     C = zeros(n)
@@ -136,8 +136,12 @@ function bellman_update(V::Vector{Float64}, Model)
         init = (lb + ub)/2
 
         # Optimization
-        Sol = optimize(x -> -obj(V, x, a, z, w, age, Model), lb, ub, init)
-        a_new = Optim.minimizer(Sol)[1]
+        if lb < ub
+            Sol = optimize(x -> -obj(V, x, a, z, w, age, Model), lb, ub, init)
+            a_new = Optim.minimizer(Sol)[1]
+        else
+            a_new = 0.
+        end
 
         # Deduce optimal value function and consumption
         c = c_transition(a, a_new, z, w, age,  Model)
