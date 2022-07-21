@@ -23,17 +23,31 @@ function state_transition(z_next::Float64, skill_next::Float64, age_next::Int64,
 end
 export state_transition
 
-function a_transition(a::Float64, c::Float64, z::Float64, w::Float64, Model)
-    (; r) = Model
-    a_next = (1 + r) * a + w * z - c 
+function a_transition(a::Float64, c::Float64, z::Float64, w::Float64, age::Float64,  Model)
+    (; r, Ω) = Model
+    a_next = (1 + r) * a + Ω[Int(age)] * w * z - c 
     return a_next
 end
 export a_transition
 
+function c_transition(a::Float64, a_next::Float64, z::Float64, w::Float64, age::Float64,  Model)
+    (; r, Ω) = Model
+    c = (1 + r) * a + Ω[Int(age)] * w * z - a_next 
+    return c
+end
+export c_transition
+
+function ubound(a::Float64, z::Float64, w::Float64, age::Float64,  Model)
+    (; r, Ω) = Model
+    ub = (1 + r) * a + Ω[Int(age)] * w * z
+    return [ub]
+end
+export ubound
+
 function eval_value_function(V::Vector{Float64}, C::Vector{Float64}, Model)
-    (; β, z_chain, skill_chain, age_chain, a_vals, n, s_vals, u, U) = Model
+    (; β, z_chain, skill_chain, age_chain, a_vals, n, s_vals, u) = Model
     Tv = zeros(n)
-    Threads.@threads for s_i in 1:n
+    for s_i in 1:n
         # Get the value of the asset for a given state
         a = s_vals[s_i, 1]
         # Get the value of the idiosync shock for a given state
@@ -45,7 +59,7 @@ function eval_value_function(V::Vector{Float64}, C::Vector{Float64}, Model)
         # Get the value of consumption for a given state
         c = C[s_i]
         # Deduce the asset for the following state with the transition rule
-        a_next = a_transition(a, c, z, w, Model)
+        a_next = a_transition(a, c, z, w, age, Model)
         # Initialise the expectation
         Ev_new = 0
         for z_next ∈ z_chain.state_values
@@ -72,7 +86,7 @@ end
 export eval_value_function
 
 function obj(V::Vector{Float64}, a_new, a::Float64, z::Float64, w::Float64, age::Float64, Model)
-    (;z_chain, skill_chain, age_chain, s_vals, a_vals, r, β, u, U) = Model
+    (;z_chain, skill_chain, age_chain, s_vals, a_vals, r, β, u) = Model
     # Initialise the expectation
     Ev_new = 0
     for z_next ∈ z_chain.state_values
@@ -117,7 +131,7 @@ function bellman_update(V::Vector{Float64}, Model)
         # Specify lower bound for optimisation
         lb = zeros(1) .+ ϵ        
         # Specify upper bound for optimisation
-        ub = [a * (1+r) + z * w] .- ϵ
+        ub = ubound(a, z, w, age, Model)
         # Specify the initial value in the middle of the range
         init = (lb + ub)/2
 
@@ -126,15 +140,15 @@ function bellman_update(V::Vector{Float64}, Model)
         a_new = Optim.minimizer(Sol)[1]
 
         # Deduce optimal value function and consumption
-        c = w * z + (1 + r) * a - a_new
+        c = c_transition(a, a_new, z, w, age,  Model)
         if c > 0
-            C[s_i] = c
             Tv[s_i] = obj(V, a_new, a, z, w, age, Model) 
         else
-            C[s_i] = 0
-            a_new = w * z + (1 + r) * a
+            c = 0
+            a_new = a_transition(a, c, z, w, age,  Model)
             Tv[s_i] = obj(V, a_new, a, z, w, age, Model) 
         end
+        C[s_i] = c
     end
     return (Tv=Tv, C=C)
 
@@ -200,7 +214,7 @@ function simulate_model(dr::Vector{Float64}, Model; N=1, a0=0.5, T=1000)
             c0 = C[argmin(abs.(s_vals[1:a_size,1] .- a0))]
             sim[n, t, : ] = [a0, z0, w0, age0, c0]
 
-            a0 = a_transition(a0, c0, z0, w0, Model)
+            a0 = a_transition(a0, c0, z0, w0, age0, Model)
             z0 = Z[t+1]
             w0 = W[t+1]
             age0 = AGE[t+1]
@@ -211,13 +225,14 @@ end
 export simulate_model
 
 function get_asset_from_dr(dr::Vector{Float64}, Model)
-    (;s_vals, r) = Model
+    (;s_vals, r, Ω) = Model
 
+    OMEGA = get.(Ref(Ω), Int.(s_vals[:,4]), missing)
     W = s_vals[:, 3]
-    Z = Model.s_vals[:, 2]
-    A = Model.s_vals[:, 1]
+    Z = s_vals[:, 2]
+    A = s_vals[:, 1]
     C = dr
-    return W .* Z + (1 + r) * A  - C
+    return OMEGA .* W .* Z + (1 + r) * A  - C
 
 end
 export get_asset_from_dr

@@ -31,6 +31,7 @@ Params = @with_kw (
                     s_vals_index = gridmake(1:a_size, 1:z_size, 1:skill_size, 1:age_size),
                     u = σ == 1 ? c -> log(c) : c -> (c^(1 - σ)) / (1 - σ),
                     U = Σ == 1 ? a -> log(a) : a -> (a^(1 - Σ)) / (1 - Σ),
+                    Ω = Dict(zip(age_chain.state_values, [0.5; 1.; 0.])),
 )
 
 Model = Params()
