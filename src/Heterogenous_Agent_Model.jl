@@ -1,6 +1,6 @@
 module Heterogenous_Agent_Model
 
-using LinearAlgebra, Statistics, Interpolations, Optim, ProgressBars, Printf
+using LinearAlgebra, Statistics, Interpolations, Optim, ProgressBars, Printf, QuantEcon
 
 function state_transition(z_next::Float64, skill_next::Float64, age_next::Int64, z::Float64, skill::Float64, age::Float64, Model)
     (; z_chain, skill_chain, age_chain) = Model
