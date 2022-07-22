@@ -15,13 +15,15 @@ Params = @with_kw (
                                             0. 1.], 
                                         [0.5; 1.0]),
                     age_chain = MarkovChain(
-                                            [0. 1. 0.; 
-                                            0.15 0. 0.85; 
-                                            1. 0. 0.], 
-                                            collect(1:3)),
+                                            [0. 1. 0. 0. 0.; 
+                                            0.05 0. 0.95 0. 0.; 
+                                            0.05 0. 0.95 0. 0.; 
+                                            0.05 0. 0.95 0. 0.; 
+                                            1. 0. 0. 0. 0.], 
+                                            collect(1:5)),
                     a_min = 1e-10,
-                    a_max = 20.0,
-                    a_size = 50,
+                    a_max = 10.0,
+                    a_size = 25,
                     a_vals = range(a_min, a_max, length = a_size),
                     z_size = length(z_chain.state_values),
                     skill_size = length(skill_chain.state_values),
@@ -32,13 +34,13 @@ Params = @with_kw (
                     u = σ == 1 ? c -> log(c) : c -> (c^(1 - σ)) / (1 - σ),
                     U = Σ == 1 ? a -> log(a) : a -> (a^(1 - Σ)) / (1 - Σ),
                     Ω = Dict(zip(age_chain.state_values, [0.5; 1.; 0.])),
-)
+);
 
-Model = Params()
-C = ones(Model.n) * Model.a_min
+Model = Params();
+C = ones(Model.n) * Model.a_min;
 V = zeros(Model.n); 
 
-eval_value_function(V, C, Model)
+eval_value_function(V, C, Model);
 
 bell = bellman_update(V, Model)
 

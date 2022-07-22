@@ -39,7 +39,9 @@ export c_transition
 
 function ubound(a::Float64, z::Float64, w::Float64, age::Float64,  Model)
     (; r, Ω) = Model
-    ub = (1 + r) * a + Ω[Int(age)] * w * z
+    # Case when you save everything, no consumption only savings
+    c = 0 
+    ub = (1 + r) * a + Ω[Int(age)] * w * z - c
     return [ub]
 end
 export ubound
@@ -106,8 +108,8 @@ function obj(V::Vector{Float64}, a_new, a::Float64, z::Float64, w::Float64, age:
             end
         end
     end
-
-    VF = u(a * (1+r) + z * w - a_new[1]) + β* Ev_new
+    
+    VF = u(c_transition(a, a_new[1], z, w, age,  Model)) + β* Ev_new
     return VF
 end
 export obj
@@ -136,7 +138,7 @@ function bellman_update(V::Vector{Float64}, Model)
         init = (lb + ub)/2
 
         # Optimization
-        if lb < ub
+        if lb < ub #| age < 3.
             Sol = optimize(x -> -obj(V, x, a, z, w, age, Model), lb, ub, init)
             a_new = Optim.minimizer(Sol)[1]
         else
