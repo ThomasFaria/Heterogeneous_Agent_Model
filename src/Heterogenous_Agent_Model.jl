@@ -19,7 +19,7 @@ function state_transition(z_next::Float64, skill_next::Float64, age_next::Int64,
 
     π = z_chain.p[z_i, next_z_i] * skill_chain.p[skill_i, next_skill_i] * age_chain.p[age_i, next_age_i]
 
-    return π[:][1]
+    return π[:][begin]
 end
 export state_transition
 
@@ -74,7 +74,7 @@ function eval_value_function(V::Vector{Float64}, C::Vector{Float64}, Model)
                         # # Extract the value function a skill given for the next shock
                         v = V[(s_vals[:,2] .== z_next) .&& (s_vals[:,3] .== skill_next) .&& (s_vals[:,4] .== age_next)]
                         # Interpolate the value function on the asset for the following state
-                        v_new = CubicSplineInterpolation(a_vals, v, extrapolation_bc = Line())(a_next[1])
+                        v_new = CubicSplineInterpolation(a_vals, v, extrapolation_bc = Line())(a_next[begin])
                         # Compute the expectation
                         Ev_new += v_new * π
                     end
@@ -88,7 +88,7 @@ end
 export eval_value_function
 
 function obj(V::Vector{Float64}, a_new, a::Float64, z::Float64, w::Float64, age::Float64, Model)
-    (;z_chain, skill_chain, age_chain, s_vals, a_vals, r, β, u) = Model
+    (;z_chain, skill_chain, age_chain, s_vals, a_vals, β, u) = Model
     # Initialise the expectation
     Ev_new = 0
     for z_next ∈ z_chain.state_values
@@ -101,7 +101,7 @@ function obj(V::Vector{Float64}, a_new, a::Float64, z::Float64, w::Float64, age:
                     # # Extract the value function a skill given for the next shock
                     v = V[(s_vals[:,2] .== z_next) .&& (s_vals[:,3] .== skill_next) .&& (s_vals[:,4] .== age_next)]
                     # Interpolate the value function on the asset for the following state
-                    v_new = CubicSplineInterpolation(a_vals, v, extrapolation_bc = Line())(a_new[1])
+                    v_new = CubicSplineInterpolation(a_vals, v, extrapolation_bc = Line())(a_new[begin])
                     # Compute the expectation
                     Ev_new += v_new * π
                 end
@@ -109,7 +109,7 @@ function obj(V::Vector{Float64}, a_new, a::Float64, z::Float64, w::Float64, age:
         end
     end
     
-    VF = u(c_transition(a, a_new[1], z, w, age,  Model)) + β* Ev_new
+    VF = u(c_transition(a, a_new[begin], z, w, age,  Model)) + β* Ev_new
     return VF
 end
 export obj
@@ -131,7 +131,7 @@ function bellman_update(V::Vector{Float64}, Model)
         age = s_vals[s_i, 4]
 
         # Specify lower bound for optimisation
-        lb = zeros(1) .+ ϵ        
+        lb = zeros(1)        
         # Specify upper bound for optimisation
         ub = ubound(a, z, w, age, Model)
         # Specify the initial value in the middle of the range
@@ -140,7 +140,7 @@ function bellman_update(V::Vector{Float64}, Model)
         # Optimization
         if lb < ub #| age < 3.
             Sol = optimize(x -> -obj(V, x, a, z, w, age, Model), lb, ub, init)
-            a_new = Optim.minimizer(Sol)[1]
+            a_new = Optim.minimizer(Sol)[begin]
         else
             a_new = 0.
         end
@@ -205,11 +205,11 @@ function simulate_model(dr::Vector{Float64}, Model; N=1, a0=0.5, T=1000)
     for n ∈ ProgressBar(1:N)
         Z = simulate(z_chain, T+1)
         W = simulate(skill_chain, T+1)
-        AGE = simulate(age_chain, T+1, init = 1)
+        AGE = Float64.(simulate(age_chain, T+1, init = 1))
     
-        z0 = Z[1]
-        w0 = W[1]
-        age0 = AGE[1]
+        z0 = Z[begin]
+        w0 = W[begin]
+        age0 = AGE[begin]
         a0 = a_init
         for t ∈ 1:T
             C = dr[(s_vals[:,2] .== z0) .&& 
