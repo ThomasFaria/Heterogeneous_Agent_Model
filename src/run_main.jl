@@ -17,13 +17,13 @@ Params = @with_kw (
                     age_chain = MarkovChain(
                                             [0. 1. 0. 0. 0.; 
                                             0.05 0. 0.95 0. 0.; 
-                                            0.05 0. 0.95 0. 0.; 
-                                            0.05 0. 0.95 0. 0.; 
+                                            0.10 0. 0. 0.9  0.; 
+                                            0.20 0. 0. 0. 0.8; 
                                             1. 0. 0. 0. 0.], 
                                             collect(1:5)),
                     a_min = 1e-10,
                     a_max = 10.0,
-                    a_size = 25,
+                    a_size = 70,
                     a_vals = range(a_min, a_max, length = a_size),
                     z_size = length(z_chain.state_values),
                     skill_size = length(skill_chain.state_values),
@@ -33,7 +33,7 @@ Params = @with_kw (
                     s_vals_index = gridmake(1:a_size, 1:z_size, 1:skill_size, 1:age_size),
                     u = σ == 1 ? c -> log(c) : c -> (c^(1 - σ)) / (1 - σ),
                     U = Σ == 1 ? a -> log(a) : a -> (a^(1 - Σ)) / (1 - Σ),
-                    Ω = Dict(zip(age_chain.state_values, [0.5; 1.; 0.])),
+                    Ω = Dict(zip(age_chain.state_values, [0.5; 0.75; 1.; 1.1; 0.])),
 );
 
 Model = Params();
