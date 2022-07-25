@@ -1,4 +1,5 @@
-using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Serialization, StatsPlots
+using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Serialization, StatsPlots, AxisArrays
+
 
 Params = @with_kw (
                     r = 0.04, # interest rate
@@ -41,37 +42,56 @@ C = ones(Model.n) * Model.a_min;
 V = zeros(Model.n); 
 
 eval_value_function(V, C, Model);
-
-bell = bellman_update(V, Model)
-
+bell = bellman_update(V, Model);
 sol = solve_PFI(Model)
+
+DR = (  V = AxisArray(reshape(sol.V, (Model.a_size, Model.z_size, Model.skill_size, Model.age_size));
+                    a = 1:Model.a_size,
+                    Z = ([:Low, :High]),
+                    Skill = ([:Low, :High]),
+                    Age = 1:Model.age_size),
+
+        C = AxisArray(reshape(sol.C, (Model.a_size, Model.z_size, Model.skill_size, Model.age_size));
+                    a = 1:Model.a_size,
+                    Z = ([:Low, :High]),
+                    Skill = ([:Low, :High]),
+                    Age = 1:Model.age_size)
+)
+
+DR.C[Z = :Low, Skill = :Low, Age = 1]
+
 
 z_vals = Model.z_chain.state_values
 skill_vals = Model.skill_chain.state_values
 age_vals = Model.age_chain.state_values
 
-a_star = get_asset_from_dr(sol.C, Model)
+a_star = AxisArray(reshape(get_asset_from_dr(sol.C, Model), (Model.a_size, Model.z_size, Model.skill_size, Model.age_size));
+                    a = 1:Model.a_size,
+                    Z = ([:Low, :High]),
+                    Skill = ([:Low, :High]),
+                    Age = 1:Model.age_size
+                    );
 
 ### Plot the next period asset in function of the current asset
-plot(Model.a_vals, a_star[(Model.s_vals[:,2] .== 0.1) .&& (Model.s_vals[:,3] .== 1.) .&& (Model.s_vals[:,4] .== 1.)], 
-labels = L"z = 0.1", lw = 2, alpha = 0.6, legend=:bottomright)
-plot!(Model.a_vals, a_star[(Model.s_vals[:,2] .== 1.) .&& (Model.s_vals[:,3] .== 1.) .&& (Model.s_vals[:,4] .== 1)], 
-labels = L"z = 1.0", lw = 2, alpha = 0.6)
+plot(Model.a_vals, a_star[Z = :Low, Skill = :Low, Age = 1], 
+labels = L"z = Low", lw = 2, alpha = 0.6, legend=:bottomright)
+plot!(Model.a_vals, a_star[Z = :High, Skill = :Low, Age = 1], 
+labels = L"z = High", lw = 2, alpha = 0.6)
 plot!(Model.a_vals, Model.a_vals, label = "", color = :black, linestyle = :dash)
 plot!(xlabel = "current assets", ylabel = "next period assets")
 
-plot( [i for i in Model.a_vals], sol.C[(Model.s_vals[:,2] .== z_vals[1]) .&& (Model.s_vals[:,3] .== skill_vals[1]) .&& (Model.s_vals[:,4] .== age_vals[1])],
-    label = L"z = %$(z_vals[1])",legend=:bottomright)
-plot!([i for i in Model.a_vals], sol.C[(Model.s_vals[:,2] .== z_vals[2]) .&& (Model.s_vals[:,3] .== skill_vals[1]) .&& (Model.s_vals[:,4] .== age_vals[1])], 
-    label = L"z = %$(z_vals[2])",legend=:bottomright)
+plot( Model.a_vals, DR.C[Z = :Low, Skill = :Low, Age = 1],
+    label = L"z = Low",legend=:bottomright)
+plot!(Model.a_vals, DR.C[Z = :High, Skill = :Low, Age = 1], 
+    label = L"z = High",legend=:bottomright)
 xlabel!(L"Assets")
 ylabel!(L"Consumption")
 title!(L"Decision \: rule")
 
-plot( [i for i in Model.a_vals], sol.V[(Model.s_vals[:,2] .== z_vals[1]) .&& (Model.s_vals[:,3] .== skill_vals[1]) .&& (Model.s_vals[:,4] .== age_vals[1])],
-    label = L"z = %$(z_vals[1])",legend=:bottomright)
-plot!([i for i in Model.a_vals], sol.V[(Model.s_vals[:,2] .== z_vals[2]) .&& (Model.s_vals[:,3] .== skill_vals[1]) .&& (Model.s_vals[:,4] .== age_vals[1])],
-    label = L"z = %$(z_vals[2])",legend=:bottomright)
+plot( Model.a_vals, DR.V[Z = :Low, Skill = :Low, Age = 1],
+    label = L"z = Low",legend=:bottomright)
+plot!(Model.a_vals, DR.V[Z = :High, Skill = :Low, Age = 1], 
+    label = L"z = High",legend=:bottomright)
 xlabel!(L"Assets")
 ylabel!(L"Value function")
 title!(L"Decision \: rule")
