@@ -149,3 +149,12 @@ title!(L"Distribution \: of \: assets  \: in  \: function  \: of \: age")
 # TODO: Comprendre pourquoi il n'y a pas d'effet avec l'age? Comment modéliser les différences d'age ? 
 # Faire ca !! 
 # TODO: Pourquoi mon code est si long, qu'est ce que je fais de si peu optimal ?
+
+μ = reduce(hcat, [
+    repeat([1/Model.a_size], inner = Model.n),
+    repeat(stationary_distributions(Model.z_chain)[begin], inner = Int(Model.n/Model.z_size)),
+    repeat([0.6, 0.4], inner = Int(Model.n/Model.skill_size)),
+    repeat(stationary_distributions(Model.age_chain)[begin], inner = Int(Model.n/Model.age_size))
+])
+
+sum(prod(μ, dims=2))
