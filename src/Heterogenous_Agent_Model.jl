@@ -38,10 +38,14 @@ end
 export c_transition
 
 function ubound(a::Float64, z::Float64, w::Float64, age::Float64,  Model)
-    (; r, Ω) = Model
+    (; r, Ω, a_min) = Model
     # Case when you save everything, no consumption only savings
-    c = 0 
+    c = a_min
     ub = (1 + r) * a + Ω[Int(age)] * w * z - c
+
+    if ub < a_min
+        ub = a_min
+    end
     return [ub]
 end
 export ubound
@@ -115,8 +119,7 @@ end
 export obj
 
 function bellman_update(V::Vector{Float64}, Model)
-    (; n, s_vals, ϵ) = Model
-    
+    (; n, s_vals, a_min) = Model
     Tv = zeros(n)
     C = zeros(n)
     # Loop through the different states
@@ -131,18 +134,18 @@ function bellman_update(V::Vector{Float64}, Model)
         age = s_vals[s_i, 4]
 
         # Specify lower bound for optimisation
-        lb = zeros(1)        
+        lb = [a_min]        
         # Specify upper bound for optimisation
         ub = ubound(a, z, w, age, Model)
         # Specify the initial value in the middle of the range
         init = (lb + ub)/2
 
         # Optimization
-        if lb < ub #| age < 3.
+        if lb != ub
             Sol = optimize(x -> -obj(V, x, a, z, w, age, Model), lb, ub, init)
             a_new = Optim.minimizer(Sol)[begin]
         else
-            a_new = 0.
+            a_new = a_min
         end
 
         # Deduce optimal value function and consumption
