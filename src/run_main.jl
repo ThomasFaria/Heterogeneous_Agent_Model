@@ -42,7 +42,7 @@ C = ones(Model.n) * Model.a_min;
 V = zeros(Model.n); 
 
 eval_value_function(V, C, Model);
-bell = bellman_update(V, Model);
+bell = bellman_update(eval_value_function(V, C, Model), Model);
 sol = solve_PFI(Model)
 
 DR = (  V = AxisArray(reshape(sol.V, (Model.a_size, Model.z_size, Model.skill_size, Model.age_size));

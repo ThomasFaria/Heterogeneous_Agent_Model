@@ -165,14 +165,11 @@ end
 export bellman_update
 
 function solve_PFI(Model; maxit=300, η_tol=1e-5, verbose=false)
-    (;n) = Model
+    (;n, a_min) = Model
 
-    # Initialize the value function
-    V = zeros(n)
+    # First evaluation of the value function 
+    V = eval_value_function(zeros(n), zeros(n) .+ a_min, Model)
 
-    # Initialize the consumption function
-    C = zeros(n)
-    
     η0 = 1.0
     iter = ProgressBar(1:maxit)
     for n in iter
