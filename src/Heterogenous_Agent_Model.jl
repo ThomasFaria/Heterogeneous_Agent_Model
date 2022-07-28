@@ -113,7 +113,8 @@ function obj(V::Vector{Float64}, a_new, a::Float64, z::Float64, w::Float64, age:
         end
     end
     
-    VF = u(c_transition(a, a_new[begin], z, w, age,  Model)) + β* Ev_new
+    c = c_transition(a, a_new[begin], z, w, age,  Model)
+    VF = u(c) + β* Ev_new
     return VF
 end
 export obj
@@ -147,16 +148,10 @@ function bellman_update(V::Vector{Float64}, Model)
         else
             a_new = a_min
         end
-
         # Deduce optimal value function and consumption
         c = c_transition(a, a_new, z, w, age,  Model)
-        if c > 0
-            Tv[s_i] = obj(V, a_new, a, z, w, age, Model) 
-        else
-            c = 0
-            a_new = a_transition(a, c, z, w, age,  Model)
-            Tv[s_i] = obj(V, a_new, a, z, w, age, Model) 
-        end
+
+        Tv[s_i] = obj(V, a_new, a, z, w, age, Model) 
         C[s_i] = c
     end
     return (Tv=Tv, C=C)
