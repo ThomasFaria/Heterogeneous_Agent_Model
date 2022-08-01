@@ -1,6 +1,81 @@
 module Heterogenous_Agent_Model
 
-using LinearAlgebra, Statistics, Interpolations, Optim, ProgressBars, Printf, QuantEcon
+using LinearAlgebra, Statistics, Interpolations, Optim, ProgressBars, Printf, QuantEcon, CSV, NLsolve
+
+
+function import_aging_prob(age_min::Int64, age_max::Int64)
+    data = CSV.read("data/LifeTables.csv", NamedTuple)
+    ψ = data.Prob2survive
+    # After a certain age death is certain
+    ψ[age_max+1:end] .= 0
+
+    return ψ[age_min+1:end]
+end
+export import_aging_prob
+
+
+function pop_distrib(μ_1::Vector{Float64}, ψ::Vector{Float64}, find_root::Bool)
+    μ = zeros(size(ψ))
+    μ[begin] = μ_1[1]
+
+    for (index, value) in enumerate(ψ[2:end])
+        μ[index+1] = value* μ[index]
+    end
+
+    if find_root
+        return sum(μ) - 1
+    else
+        return μ
+    end
+end
+
+function get_pop_distrib(ψ::Vector{Float64})
+    # Find first share that assure a sum equal to 1
+    sol = nlsolve(x -> pop_distrib(x, ψ, true), [0.02])
+    μ = pop_distrib(sol.zero, ψ, false)
+    return μ
+end
+export get_pop_distrib
+
+
+function get_efficiency(age_min::Int64, age_max::Int64)
+    ϵ =  [exp(-1.46 + 0.070731*j - 0.00075*j^2) for j in age_min:age_max]
+    return ϵ
+end
+export get_efficiency
+
+
+function get_soc_sec_benefit(ϵ::Vector{Float64}, h::Float64, w::Float64, j_star::Int64, J::Int64, Policy::NamedTuple)
+    (; θ) = Policy
+    W = w * h * ϵ
+    b  = zeros(J)
+    b[j_star:end] .= θ * mean(W)
+    return b
+end
+export get_soc_sec_benefit
+
+function get_wages(ϵ::Vector{Float64}, h::Float64, w::Float64, Policy::NamedTuple)
+    (; ξ) = Policy
+    W = zeros(size(ϵ, 1), 2)
+
+    W[:,1] = w * h * ϵ
+    W[:,2] .= w * h * ξ
+    return W
+end
+export get_wages
+
+function get_dispo_income(W::Matrix{Float64}, b::Vector{Float64}, j_star::Int64, Policy::NamedTuple)
+    (; τ_ssc, τ_u) = Policy
+    q = zeros(size(b, 1), 2)
+
+    q[begin:j_star,1] = W[:,1]
+    q[begin:j_star,2] = (1 - τ_ssc - τ_u) * W[:,2]
+    q[j_star+1:end,:] .= b[j_star+1:end]
+    return q
+end
+export get_dispo_income
+
+
 
 function state_transition(z_next::Float64, skill_next::Float64, age_next::Int64, z::Float64, skill::Float64, age::Float64, Model)
     (; z_chain, skill_chain, age_chain) = Model
