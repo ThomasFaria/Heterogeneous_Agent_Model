@@ -58,8 +58,8 @@ function get_wages(ϵ::Vector{Float64}, h::Float64, w::Float64, Policy::NamedTup
     (; ξ) = Policy
     W = zeros(size(ϵ, 1), 2)
 
-    W[:,1] = w * h * ϵ
-    W[:,2] .= w * h * ξ
+    W[:,1] .= w * h * ξ
+    W[:,2] = w * h * ϵ
     return W
 end
 export get_wages
@@ -76,6 +76,11 @@ end
 export get_dispo_income
 
 
+
+
+
+
+### Old model
 
 function state_transition(z_next::Float64, skill_next::Float64, age_next::Int64, z::Float64, skill::Float64, age::Float64, Model)
     (; z_chain, skill_chain, age_chain) = Model
