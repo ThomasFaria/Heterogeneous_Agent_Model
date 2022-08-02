@@ -1,6 +1,6 @@
 module Heterogenous_Agent_Model
 
-using LinearAlgebra, Statistics, Interpolations, Optim, ProgressBars, Printf, QuantEcon, CSV, NLsolve
+using LinearAlgebra, Statistics, Interpolations, Optim, ProgressBars, Printf, QuantEcon, CSV, NLsolve, AxisArrays
 
 
 function import_aging_prob(age_min::Int64, age_max::Int64)
@@ -75,9 +75,135 @@ function get_dispo_income(W::Matrix{Float64}, b::Vector{Float64}, j_star::Int64,
 end
 export get_dispo_income
 
+function state_transition_OLG(z_next::Symbol, z::Symbol, Params::NamedTuple)
+    (; z_chain) = Params
 
+    # Get the index of the current/next idiosync shock in the transition matrix
+    z_i = z_chain.state_values .== z
+    next_z_i = z_chain.state_values .== z_next
 
+    π = z_chain.p[z_i, next_z_i]
+    return π[:][begin]
+end
+export state_transition_OLG
 
+function get_state_value_index(mc::MarkovChain, value)
+    idx = findall(mc.state_values .== value)
+    return idx[begin]
+end 
+export get_state_value_index
+
+function c_transition_OLG(a_past::Float64, a::Vector{Float64}, z::Symbol, age::Int64,  Params::NamedTuple)
+    (; r, q, z_chain) = Params
+    idx = get_state_value_index(z_chain, z)
+
+    c = (1 + r) * a_past + q[age, idx] - a[begin] 
+    return c
+end
+export c_transition_OLG
+
+function ubound(a_past::Float64, z::Symbol, age::Int64,  Params::NamedTuple)
+    (; r, q, z_chain, a_min) = Params
+    idx = get_state_value_index(z_chain, z)
+
+    # Case when you save everything, no consumption only savings
+    c =  a_min
+    ub = (1 + r) * a_past + q[age, idx] - c
+    ub = ifelse(ub <= a_min, a_min, ub)
+
+    return [ub]
+end
+export ubound
+
+function obj_OLG(V::AxisArray{Float64, 3}, a::Vector{Float64}, a_past::Float64, z::Symbol, age::Int64, Params::NamedTuple)
+    (; ψ, β, z_chain, a_vals, β, u, J, j_star) = Params
+    c = c_transition_OLG(a_past, a, z, age, Params)
+
+    if age == J
+        VF = u(c) 
+    elseif (age < J) & (age >= j_star - 1)
+        # # Extract the value function (z is a placeholder here)
+        v = V[Age = age + 1, Z = z]
+        # Interpolate the value function on the asset for the following state
+        v_new = CubicSplineInterpolation(a_vals, v, extrapolation_bc = Line())(a[begin])
+        VF = u(c) + β * ψ[age + 1] * v_new
+    else
+        # Initialise the expectation
+        Ev_new = 0
+        for z_next ∈ z_chain.state_values
+            π = state_transition_OLG(z_next, z, Params)
+            # # Extract the value function a skill given for the next shock
+            v = V[Age = age + 1, Z = z_next]
+            # Interpolate the value function on the asset for the following state
+            v_new = CubicSplineInterpolation(a_vals, v, extrapolation_bc = Line())(a[begin])
+            # Compute the expectation
+            Ev_new += v_new * π
+        end
+        VF = u(c) + β* ψ[age + 1] * Ev_new
+    end
+    return VF
+end
+export obj_OLG
+
+function get_dr(Params::NamedTuple)
+    (; β, z_chain, z_size, a_size, a_vals, a_min, β,  J) = Params
+
+    V = AxisArray(zeros(a_size, z_size, J);
+                    a = 1:a_size,
+                    Z = (z_chain.state_values),
+                    Age = 1:J
+            )
+
+    A = AxisArray(zeros(a_size, z_size, J);
+                        a = 1:a_size,
+                        Z = (z_chain.state_values),
+                        Age = 1:J
+                )
+    C = AxisArray(zeros(a_size, z_size, J);
+        a = 1:a_size,
+        Z = (z_chain.state_values),
+        Age = 1:J
+    )
+
+    # Loop over ages recursively
+    iter = ProgressBar(J:-1:1)
+    for j ∈ iter
+        # Loop over past assets
+        for a_i ∈ 1:a_size
+            a = a_vals[a_i]
+            # Loop over idiosync shock
+            for z ∈ z_chain.state_values
+                # Specify lower bound for optimisation
+                lb = [a_min]        
+                # Specify upper bound for optimisation
+                ub = ubound(a, z, j, Params)
+                # Specify the initial value in the middle of the range
+                init = (lb + ub)/2
+                # Optimization
+                Sol = optimize(x -> -obj_OLG(V, x, a, z, j, Params), lb, ub, init)
+                a_new = Optim.minimizer(Sol)
+
+                # Deduce optimal value function, consumption and asset
+                V[Age = j, Z = z, a = a_i] = obj_OLG(V, a_new, a, z, j, Params)
+                C[Age = j, Z = z, a = a_i] = c_transition_OLG(a, a_new, z, j,  Params)
+                A[Age = j, Z = z, a = a_i] = a_new[begin]
+
+            end
+        end
+    end
+    return (V = V, C = C, A = A)
+end
+export get_dr
+
+function get_r(K, L, Firm_pm::NamedTuple)
+    (;α, A, δ) = Firm_pm
+    return A * α * (L/K)^(1-α) - δ
+end
+
+function get_w(K, L, Firm_pm::NamedTuple)
+    (;α, A) = Firm_pm
+    return A * (1-α) * (K/L)^α
+end
 
 
 ### Old model
