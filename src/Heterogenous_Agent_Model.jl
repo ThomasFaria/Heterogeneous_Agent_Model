@@ -195,6 +195,73 @@ function get_dr(Params::NamedTuple)
 end
 export get_dr
 
+function simulate_OLG(dr::AxisArray{Float64, 3}, Params::NamedTuple; Initial_Z = 0.06, N=1)
+    (; J, ψ, z_chain, a_vals) = Params
+
+    A = AxisArray(fill(NaN, (J, N));
+    Age = 1:J,
+    N = 1:N
+    );
+
+    C = AxisArray(fill(NaN, (J, N));
+    Age = 1:J,
+    N = 1:N
+    );
+
+    Z = AxisArray(fill(:DEAD, (J, N));
+    Age = 1:J,
+    N = 1:N
+    );
+
+    for n ∈ ProgressBar(1:N)
+        for j ∈ 1:J
+            # Draw the survival outcome
+            prob2survive = Binomial(1, ψ[j])
+            Survived = Bool(rand(prob2survive, 1)[begin])
+            if !Survived
+                # the agent died at the beginning of the period
+                break
+            end
+
+            if j == 1
+                # In age 1, agent holds 0 asset and so doesn't consume
+                a = 0.
+                c = 0.
+                # Draw the employment state
+                prob2Unemp = Binomial(1, Initial_Z)
+                IsUnem = Bool(rand(prob2Unemp, 1)[begin])
+                z = ifelse(IsUnem, :U, :E)
+
+                # Saving the results    
+                A[Age = j, N = n] = a
+                C[Age = j, N = n] = c
+                Z[Age = j, N = n] = z
+            else
+
+                # Draw the employment state based on previous employment state
+                Z[Age = j, N = n] = simulate(z_chain, 2, 
+                                                init = get_state_value_index(z_chain, Z[Age = j-1, N = n]))[end]
+
+                # Extrapolate the next asset based on the optimal decision rule
+                A[Age = j, N = n] = CubicSplineInterpolation(a_vals, 
+                                                            dr[Z = Z[Age = j, N = n], Age = j], 
+                                                            extrapolation_bc = Line())(A[Age = j-1, N = n])
+
+                # Compute the current consumption
+                C[Age = j, N = n] = c_transition_OLG(A[Age = j-1, N = n], 
+                                                    [A[Age = j, N = n]], 
+                                                    Z[Age = j, N = n], 
+                                                    j,
+                                                    Params)
+            end
+        end
+    end
+
+    return (A = A, Z = Z, C = C)
+
+end
+export simulate_OLG
+
 function get_r(K, L, Firm_pm::NamedTuple)
     (;α, A, δ) = Firm_pm
     return A * α * (L/K)^(1-α) - δ

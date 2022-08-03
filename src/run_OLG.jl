@@ -47,22 +47,26 @@ Firms = @with_kw (
     α = 0.36,
     A = 1.3193,
     δ = 0.08,
-    )
+)
 
 Policies = Policy()
 pm = Params();
 Firm_pm = Firms();
 
+dr = get_dr(pm)
+sim = simulate_OLG(dr.A, pm, N=3000);
 
-get_dr(pm)
+pl = plot()
+xlabel!(L"Age")
+ylabel!(L"Assets")
+for n=1:3000
+    plot!(pl, sim.A[N = n] , label=nothing, color=:red, alpha=0.1)
+end
+pl
 
 
+A[Age = 1]
 
-pm.u((1+pm.r)* 1e-10 + pm.q[end, 1])
-
-plot(A[Age = 20])
-plot(C[Age = 20])
-plot(V[Age = 45])
-
-
-
+plot(dr.A[Age = 1])
+plot(dr.C[Age = 45])
+plot(dr.V[Age = 45])
