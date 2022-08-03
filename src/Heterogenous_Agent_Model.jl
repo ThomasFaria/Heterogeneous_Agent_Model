@@ -1,6 +1,6 @@
 module Heterogenous_Agent_Model
 
-using LinearAlgebra, Statistics, Interpolations, Optim, ProgressBars, Printf, QuantEcon, CSV, NLsolve, AxisArrays
+using LinearAlgebra, Statistics, Interpolations, Optim, ProgressBars, Printf, QuantEcon, CSV, NLsolve, AxisArrays, Distributions
 
 
 function import_aging_prob(age_min::Int64, age_max::Int64)
