@@ -54,7 +54,22 @@ pm = Params();
 Firm_pm = Firms();
 
 dr = get_dr(pm)
-sim = simulate_OLG(dr.A, pm, N=3000);
+sim = simulate_OLG(dr.A, pm, N=30000);
+
+
+count(sim.Z[Age = 1] .== :DEAD)/30000
+
+j = 2
+
+
+(sim.A[Age = j][sim.Z[Age = j] .== :U] .<= pm.a_vals[1]) .& (sim.A[Age = j][sim.Z[Age = j] .== :U] .>= 0.)
+
+2 <5
+
+pm.a_vals
+
+
+
 
 pl = plot()
 xlabel!(L"Age")

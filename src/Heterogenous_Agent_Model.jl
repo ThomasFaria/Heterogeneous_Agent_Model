@@ -215,13 +215,6 @@ function simulate_OLG(dr::AxisArray{Float64, 3}, Params::NamedTuple; Initial_Z =
 
     for n ∈ ProgressBar(1:N)
         for j ∈ 1:J
-            # Draw the survival outcome
-            prob2survive = Binomial(1, ψ[j])
-            Survived = Bool(rand(prob2survive, 1)[begin])
-            if !Survived
-                # the agent died at the beginning of the period
-                break
-            end
 
             if j == 1
                 # In age 1, agent holds 0 asset and so doesn't consume
@@ -237,7 +230,13 @@ function simulate_OLG(dr::AxisArray{Float64, 3}, Params::NamedTuple; Initial_Z =
                 C[Age = j, N = n] = c
                 Z[Age = j, N = n] = z
             else
-
+                # Draw the survival outcome
+                prob2survive = Binomial(1, ψ[j])
+                Survived = Bool(rand(prob2survive, 1)[begin])
+                if !Survived
+                    # the agent died at the beginning of the period
+                    break
+                end
                 # Draw the employment state based on previous employment state
                 Z[Age = j, N = n] = simulate(z_chain, 2, 
                                                 init = get_state_value_index(z_chain, Z[Age = j-1, N = n]))[end]
