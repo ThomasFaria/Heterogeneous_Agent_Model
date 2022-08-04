@@ -7,9 +7,9 @@ function import_aging_prob(age_min::Int64, age_max::Int64)
     data = CSV.read("data/LifeTables.csv", NamedTuple)
     ψ = data.Prob2survive
     # After a certain age death is certain
-    ψ[age_max+1:end] .= 0
-
-    return ψ[age_min+1:end]
+    ψ[age_max+2:end] .= 0
+    # TODO: Est ce qu'il faut pas mettre +2 ici? à verifier
+    return ψ[age_min+1:age_max+1]
 end
 export import_aging_prob
 
@@ -30,7 +30,7 @@ function pop_distrib(μ_1::Vector{Float64}, ψ::Vector{Float64}, find_root::Bool
 end
 
 function get_pop_distrib(ψ::Vector{Float64})
-    # Find first share that assure a sum equal to 1
+    # Find first share that assures a sum equal to 1
     sol = nlsolve(x -> pop_distrib(x, ψ, true), [0.02])
     μ = pop_distrib(sol.zero, ψ, false)
     return μ
@@ -68,9 +68,9 @@ function get_dispo_income(W::Matrix{Float64}, b::Vector{Float64}, j_star::Int64,
     (; τ_ssc, τ_u) = Policy
     q = zeros(size(b, 1), 2)
 
-    q[begin:j_star,1] = W[:,1]
-    q[begin:j_star,2] = (1 - τ_ssc - τ_u) * W[:,2]
-    q[j_star+1:end,:] .= b[j_star+1:end]
+    q[begin:j_star-1,1] = W[:,1]
+    q[begin:j_star-1,2] = (1 - τ_ssc - τ_u) * W[:,2]
+    q[j_star:end,:] .= b[j_star:end]
     return q
 end
 export get_dispo_income
@@ -290,35 +290,51 @@ function get_ergodic_distribution(sim::NamedTuple, Params::NamedTuple; PopScaled
                     λ0 = [vals[key]/N for key ∈ keys(vals)]
 
                     λ[Age = j, Z = z, a = i] += sum((1 .- w) .* λ0)
-                    λ[Age = j, Z = z, a = i+1] += sum(w .* λ0)
+                    if lb == a_vals[end]
+                        # If assets exceeding the grid, put everything on the last value
+                        λ[Age = j, Z = z, a = i] += sum(w .* λ0)
+                    else
+                        λ[Age = j, Z = z, a = i+1] += sum(w .* λ0)
+                    end
                 end
             end
         end
-        @assert sum(λ[Age = j]) ≈ 1.
+        # println(" By age : ", round(sum(λ[Age = j]), digits = 8), "\n")
+        # @assert sum(λ[Age = j]) ≈ 1.
         if PopScaled
             λ[Age = j] *= μ[j]
         end
     end
     if PopScaled
-        @assert sum(λ) ≈ 1.
+        # println(" Total : ", round(sum(λ), digits = 8), "\n")
+        # @assert sum(λ) ≈ 1.
     end
     return λ
 end
 export get_ergodic_distribution
 
-
-
-
-function get_r(K, L, Firm_pm::NamedTuple)
-    (;α, A, δ) = Firm_pm
+function get_r(K, L, Firm::NamedTuple)
+    (;α, A, δ) = Firm
     return A * α * (L/K)^(1-α) - δ
 end
+export get_r
 
-function get_w(K, L, Firm_pm::NamedTuple)
-    (;α, A) = Firm_pm
+function get_w(K, L, Firm::NamedTuple)
+    (;α, A) = Firm
     return A * (1-α) * (K/L)^α
 end
+export get_w
 
+function get_aggregate_K(λ::AxisArray{Float64, 3},  A::AxisArray{Float64, 3})
+    return sum(λ .* A)
+end
+export get_aggregate_K
+
+function get_aggregate_L(λ::AxisArray{Float64, 3}, Households::NamedTuple)
+    (; ϵ, h, j_star) = Households
+    return sum(λ[Z = :E, Age = 1:j_star - 1] * ϵ * h)
+end
+export get_aggregate_L
 
 ### Old model
 
