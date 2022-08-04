@@ -196,7 +196,7 @@ end
 export get_dr
 
 function simulate_OLG(dr::AxisArray{Float64, 3}, Params::NamedTuple; Initial_Z = 0.06, N=1)
-    (; J, ψ, z_chain, a_vals) = Params
+    (; J, ψ, z_chain, a_vals, a_min) = Params
 
     A = AxisArray(fill(NaN, (J, N));
     Age = 1:J,
@@ -218,8 +218,8 @@ function simulate_OLG(dr::AxisArray{Float64, 3}, Params::NamedTuple; Initial_Z =
 
             if j == 1
                 # In age 1, agent holds 0 asset and so doesn't consume
-                a = 0.
-                c = 0.
+                a = a_min
+                c = a_min
                 # Draw the employment state
                 prob2Unemp = Binomial(1, Initial_Z)
                 IsUnem = Bool(rand(prob2Unemp, 1)[begin])
