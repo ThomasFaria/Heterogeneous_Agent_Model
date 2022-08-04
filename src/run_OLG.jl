@@ -54,22 +54,110 @@ pm = Params();
 Firm_pm = Firms();
 
 dr = get_dr(pm)
-sim = simulate_OLG(dr.A, pm, N=30000);
+sim = simulate_OLG(dr.A, pm, N=3000);
+using DataStructures
 
 
-count(sim.Z[Age = 1] .== :DEAD)/30000
+λ = AxisArray(zeros(pm.a_size, pm.z_size, pm.J);
+a = 1:pm.a_size,
+Z = (pm.z_chain.state_values),
+Age = 1:pm.J
+)
 
-j = 2
+for j ∈ 1:pm.J
+    # Si on veut calculer direct avec distrib de la pop prendre N qui compte tous les ages
+    N = size(filter(!isnan,sim.A[Age = j]), 1)
+    for z ∈ pm.z_chain.state_values
+        for (i, lb) ∈ enumerate(pm.a_vals)
+            if lb == pm.a_vals[end]
+                ub = Inf
+            else
+                ub = pm.a_vals[i + 1]
+            end
+
+            # We collect all assets in a certain interval of the grid
+            idx = ((sim.A[Age = j][sim.Z[Age = j] .== z] .>= lb)) .&  (sim.A[Age = j][sim.Z[Age = j] .== z] .< ub) 
+            vals = counter(sim.A[Age = j][sim.Z[Age = j] .== z][idx])
+            # vals = unique(sim.A[Age = j][sim.Z[Age = j] .== z][idx])
+
+            # We check that this set is not empty
+            if !isempty(vals)
+                λ[Age = j, Z = z, a = i] += 0.
+                # w = Dict(key => (key - lb)./(ub - lb) for key ∈ keys(vals))
+                w = [(key - lb)./(ub - lb) for key ∈ keys(vals)]
+                # μ = Dict(key => vals[key]/N for key ∈ keys(vals))
+                μ = [vals[key]/N for key ∈ keys(vals)]
+                λ[Age = j, Z = z, a = i] += sum((1 .- w) .* μ)
+                λ[Age = j, Z = z, a = i+1] += sum(w .* μ)
+            end
+        end
+    end
+
+    @assert sum(λ[Age = j]) ≈ 1.
+    λ[Age = j] *= pm.μ[j]
+end
+
+λ2 = AxisArray(zeros(pm.a_size, pm.z_size, pm.J);
+a = 1:pm.a_size,
+Z = (pm.z_chain.state_values),
+Age = 1:pm.J
+)
+
+# Si on veut calculer direct avec distrib de la pop prendre N qui compte tous les ages
+N = size(filter(!isnan,sim.A), 1)
+for j ∈ 1:pm.J
+    for z ∈ pm.z_chain.state_values
+        for (i, lb) ∈ enumerate(pm.a_vals)
+            if lb == pm.a_vals[end]
+                ub = Inf
+            else
+                ub = pm.a_vals[i + 1]
+            end
+
+            # We collect all assets in a certain interval of the grid
+            idx = ((sim.A[Age = j][sim.Z[Age = j] .== z] .>= lb)) .&  (sim.A[Age = j][sim.Z[Age = j] .== z] .< ub) 
+            vals = counter(sim.A[Age = j][sim.Z[Age = j] .== z][idx])
+            # vals = unique(sim.A[Age = j][sim.Z[Age = j] .== z][idx])
+
+            # We check that this set is not empty
+            if !isempty(vals)
+                λ2[Age = j, Z = z, a = i] += 0.
+                # w = Dict(key => (key - lb)./(ub - lb) for key ∈ keys(vals))
+                w = [(key - lb)./(ub - lb) for key ∈ keys(vals)]
+                # μ = Dict(key => vals[key]/N for key ∈ keys(vals))
+                μ = [vals[key]/N for key ∈ keys(vals)]
+                λ2[Age = j, Z = z, a = i] += sum((1 .- w) .* μ)
+                λ2[Age = j, Z = z, a = i+1] += sum(w .* μ)
+            end
+        end
+    end
+end
+@assert sum(λ2) ≈ 1.
+
+λ
 
 
-(sim.A[Age = j][sim.Z[Age = j] .== :U] .<= pm.a_vals[1]) .& (sim.A[Age = j][sim.Z[Age = j] .== :U] .>= 0.)
-
-2 <5
-
-pm.a_vals
 
 
 
+
+
+plot(λ[Age = 60, Z = :E])
+plot!(λ[Age = 54, Z = :E])
+plot!(λ[Age = 50, Z = :E])
+plot!(λ[Age = 44, Z = :E])
+plot!(λ[Age = 1, Z = :E])
+
+sum(λ) ≈ 1.
+for key ∈ keys(vals)
+    print(vals[key])
+end
+
+sim.A[Age = 1]
+
+size(filter(!isnan,sim.A))
+
+size(filter(!isnan,sim.A[Age = 56]), 1)/size(filter(!isnan,sim.A),1)
 
 pl = plot()
 xlabel!(L"Age")
@@ -79,6 +167,8 @@ for n=1:3000
 end
 pl
 
+λ.mean(axis=(2,3))
+bar(dropdims(sum(dropdims(sum(λ, dims=3), dims=3), dims=2), dims=2))
 
 A[Age = 1]
 
