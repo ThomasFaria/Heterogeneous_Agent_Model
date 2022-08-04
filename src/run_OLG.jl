@@ -25,8 +25,8 @@ Households = @with_kw (
                     γ = 2., # Constant relative risk aversion (consumption utility)
                     Σ = 1., # Constant relative risk aversion (asset utility)
                     β = 1.011,
-                    z_chain = MarkovChain([0.9 0.1;
-                                            0.1 0.9], 
+                    z_chain = MarkovChain([0.94 0.06;
+                                           0.94 0.06], 
                                         [:U; :E]),
                     a_min = 1e-10,
                     a_max = 15.,
@@ -47,12 +47,7 @@ Policies = Policy()
 HHs = Households();
 Firm = Firms();
 
-dr = get_dr(pm)
-sim = simulate_OLG(dr.A, pm, N=10000);
-λ = get_ergodic_distribution(sim, pm)
-get_ergodic_distribution(sim, pm, PopScaled = true)
-
-
+using ProgressBars, Printf
 # Initial values
 Policies = Policy();
 Firm = Firms();
@@ -72,7 +67,7 @@ for n in iter
     # Households 
     HHs = Households(r = r, w = w);
     dr = get_dr(HHs)
-    sim = simulate_OLG(dr.A, HHs, N=1000);
+    sim = simulate_OLG(dr.A, HHs, N=2000);
     λ = get_ergodic_distribution(sim, HHs, PopScaled = true)
 
     # Aggregation
@@ -83,19 +78,23 @@ for n in iter
 
     λ = η/η0
     η0 = η
-    if verbose
-        println(n, " : ", η, " : ", λ)
-    end
-
-    K = K1
-    L = L1
 
     if η<η_tol
         println("\n Algorithm stopped after iteration ", n, ", with μ = ", λ, "\n")
-        return (λ=λ, dr=dr, sim=sim, K=K, L=L )
+        return (λ=λ, dr=dr, sim=sim, K=K1, L=L1)
     end
+
+    K = (K1 + K)/2
+    L = L1
+
     set_postfix(iter, η=@sprintf("%.8f", η), λ=@sprintf("%.8f", λ))
 end
+
+dr = get_dr(pm)
+sim = simulate_OLG(dr.A, pm, N=10000);
+λ = get_ergodic_distribution(sim, pm)
+get_ergodic_distribution(sim, pm, PopScaled = true)
+
 
 
 bar(λ[Age = 60, Z = :E])

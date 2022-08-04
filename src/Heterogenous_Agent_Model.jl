@@ -166,8 +166,7 @@ function get_dr(Params::NamedTuple)
     )
 
     # Loop over ages recursively
-    iter = ProgressBar(J:-1:1)
-    for j ∈ iter
+    for j ∈ J:-1:1
         # Loop over past assets
         for a_i ∈ 1:a_size
             a = a_vals[a_i]
@@ -213,7 +212,7 @@ function simulate_OLG(dr::AxisArray{Float64, 3}, Params::NamedTuple; Initial_Z =
     N = 1:N
     );
 
-    for n ∈ ProgressBar(1:N)
+    for n ∈ 1:N
         for j ∈ 1:J
 
             if j == 1
@@ -270,7 +269,7 @@ function get_ergodic_distribution(sim::NamedTuple, Params::NamedTuple; PopScaled
     Age = 1:J
     )
 
-    for j ∈ ProgressBar(1:J)
+    for j ∈ 1:J
         N = size(filter(!isnan,sim.A[Age = j]), 1)
         for z ∈ z_chain.state_values
             for (i, lb) ∈ enumerate(a_vals)
