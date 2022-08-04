@@ -1,6 +1,6 @@
 module Heterogenous_Agent_Model
 
-using LinearAlgebra, Statistics, Interpolations, Optim, ProgressBars, Printf, QuantEcon, CSV, NLsolve, AxisArrays, Distributions
+using LinearAlgebra, Statistics, Interpolations, Optim, ProgressBars, Printf, QuantEcon, CSV, NLsolve, AxisArrays, Distributions, DataStructures
 
 
 function import_aging_prob(age_min::Int64, age_max::Int64)
@@ -260,6 +260,54 @@ function simulate_OLG(dr::AxisArray{Float64, 3}, Params::NamedTuple; Initial_Z =
 
 end
 export simulate_OLG
+
+function get_ergodic_distribution(sim::NamedTuple, Params::NamedTuple; PopScaled::Bool = false)
+    (; a_size, z_size, J, z_chain, a_vals, μ) = Params
+    
+    λ = AxisArray(zeros(a_size, z_size, J);
+    a = 1:a_size,
+    Z = (z_chain.state_values),
+    Age = 1:J
+    )
+
+    for j ∈ ProgressBar(1:J)
+        N = size(filter(!isnan,sim.A[Age = j]), 1)
+        for z ∈ z_chain.state_values
+            for (i, lb) ∈ enumerate(a_vals)
+                if lb == a_vals[end]
+                    ub = Inf
+                else
+                    ub = a_vals[i + 1]
+                end
+
+                # We collect all assets in a certain interval of the grid
+                idx = ((sim.A[Age = j][sim.Z[Age = j] .== z] .>= lb)) .&  (sim.A[Age = j][sim.Z[Age = j] .== z] .< ub) 
+                vals = counter(sim.A[Age = j][sim.Z[Age = j] .== z][idx])
+
+                # We check that this set is not empty
+                if !isempty(vals)
+                    w = [(key - lb)./(ub - lb) for key ∈ keys(vals)]
+                    λ0 = [vals[key]/N for key ∈ keys(vals)]
+
+                    λ[Age = j, Z = z, a = i] += sum((1 .- w) .* λ0)
+                    λ[Age = j, Z = z, a = i+1] += sum(w .* λ0)
+                end
+            end
+        end
+        @assert sum(λ[Age = j]) ≈ 1.
+        if PopScaled
+            λ[Age = j] *= μ[j]
+        end
+    end
+    if PopScaled
+        @assert sum(λ) ≈ 1.
+    end
+    return λ
+end
+export get_ergodic_distribution
+
+
+
 
 function get_r(K, L, Firm_pm::NamedTuple)
     (;α, A, δ) = Firm_pm
