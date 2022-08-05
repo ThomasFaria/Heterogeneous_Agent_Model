@@ -351,6 +351,27 @@ function get_aggregate_B(λ::AxisArray{Float64, 3},  A::AxisArray{Float64, 3}, P
 end
 export get_aggregate_B
 
+function get_aggregate_C(λ::AxisArray{Float64, 3},  C::AxisArray{Float64, 3})
+    return dot(C, λ)
+end
+export get_aggregate_C
+
+function get_aggregate_I(λ::AxisArray{Float64, 3},  A::AxisArray{Float64, 3}, Firm::NamedTuple, Params::NamedTuple)
+    (; δ) = Firm
+    K = dot(λ, A)
+    K_past = get_aggregate_K(λ, A, Params)
+    return K - (1 - δ) * K_past
+end
+export get_aggregate_I
+
+function get_aggregate_Y(λ::AxisArray{Float64, 3},  A::AxisArray{Float64, 3}, Firm::NamedTuple, Params::NamedTuple)
+    (; Ω, α) = Firm
+    K = get_aggregate_K(λ, A, Params)
+    L = get_aggregate_L(λ, Params)
+    return Ω * K^α * L^(1 - α)
+end
+export get_aggregate_Y
+
 function solve_equilibrium(K0::Float64, L0::Float64, B0::Float64, Firms::NamedTuple, Households::NamedTuple ; N=2000, maxit=300, η_tol_K=1e-3, η_tol_B=1e-3, α_K=0.33, α_B=0.33)
     η0_K = 1.0
     η0_B = 1.0
