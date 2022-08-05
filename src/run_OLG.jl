@@ -49,16 +49,16 @@ Firms = @with_kw (
 Firm = Firms();
 r = 0.04
 w = r_to_w(r, Firm)
-B = 3
 Policies = Policy()
 HHs = Households();
 L = 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ)
-K = 3.
+K = 4.109594198432264
+B = 0.0499048281549706
 
 x = solve_equilibrium(
-    4.2929306960632285, 
-    0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ),
-    0.05198993101861361,
+    K, 
+    L,
+    B,
     Firms(), 
     Households()
 )
@@ -66,6 +66,8 @@ x = solve_equilibrium(
 get_r(x.K, 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ), Firm)
 
 x.K
+x.B
+
 plot(x.dr.V[Age = 65])
 
 bar(HHs.a_vals, sum(x.λ[Age = 60] / HHs.μ[60], dims=2))
