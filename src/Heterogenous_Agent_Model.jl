@@ -326,11 +326,28 @@ function r_to_w(r::Float64, Firm::NamedTuple)
 end
 export r_to_w
 
+function get_SSC_rate(λ::AxisArray{Float64, 3}, w::Float64, Params::NamedTuple)
+    (; j_star, J, h, ϵ, b) = Params
+    SSC = sum(λ[Age = j_star:J]) * b[j_star]
+    tax_base = sum(λ[Age = 1:j_star-1, Z = :E] * ϵ ) * w * h
+    return SSC/tax_base
+end
+export get_SSC_rate
+
+function get_U_benefit_rate(λ::AxisArray{Float64, 3}, w::Float64, Params::NamedTuple, Policy::NamedTuple)
+    (; j_star, J, h, ϵ) = Params
+    (; ξ) = Policy
+    U_benefit = sum(λ[Age = j_star:J]) * ξ * w * h
+    tax_base = sum(λ[Age = 1:j_star-1, Z = :E] * ϵ ) * w * h
+    return U_benefit/tax_base
+end
+export get_U_benefit_rate
+
 function get_aggregate_K(λ::AxisArray{Float64, 3},  A::AxisArray{Float64, 3}, Params::NamedTuple)
-    (; a_size, z_size, J) = Params
+    (; a_size, z_size, J, a_min) = Params
     A_past = similar(A)
     A_past[Age = 2:J] = A[Age = 1:J-1]
-    A_past[Age = 1] = zeros(a_size, z_size)
+    A_past[Age = 1] = ones(a_size, z_size) * a_min
     return dot(A_past, λ)
 end
 export get_aggregate_K
@@ -372,10 +389,11 @@ function get_aggregate_Y(λ::AxisArray{Float64, 3},  A::AxisArray{Float64, 3}, F
 end
 export get_aggregate_Y
 
-function solve_equilibrium(K0::Float64, L0::Float64, B0::Float64, Firms::NamedTuple, Households::NamedTuple ; N=2000, maxit=300, η_tol_K=1e-3, η_tol_B=1e-3, α_K=0.33, α_B=0.33)
+function solve_equilibrium(K0::Float64, L0::Float64, B0::Float64, Firms::NamedTuple, Households::NamedTuple, Policy::NamedTuple ; N=2000, maxit=300, η_tol_K=1e-3, η_tol_B=1e-3, α_K=0.4, α_B=0.4)
     η0_K = 1.0
     η0_B = 1.0
     Firm = Firms
+    Policies = Policy
     iter = ProgressBar(1:maxit)
     for n in iter
         ## Firm 
@@ -391,10 +409,13 @@ function solve_equilibrium(K0::Float64, L0::Float64, B0::Float64, Firms::NamedTu
         # Aggregation
         K1 = get_aggregate_K(λ,  dr.A, HHs)
         B1 = get_aggregate_B(λ,  dr.A, HHs)
-        # L1 = get_aggregate_L(λ, HHs)
 
-        η_K = abs(K1 - K0)/K0 
-        η_B = abs(B1 - B0)/B0 
+        # Policies
+        # Policies.τ_ssc = get_SSC_rate(λ, w, HHs)
+        # Policies.τ_u = get_U_benefit_rate(λ, w, HHs, Policies)
+
+        η_K = abs(K1 - K0) 
+        η_B = abs(B1 - B0) 
 
         λ_K = η_K/η0_K
         λ_B = η_B/η0_B
