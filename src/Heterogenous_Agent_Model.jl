@@ -315,14 +315,14 @@ end
 export get_ergodic_distribution
 
 function get_r(K::Float64, L::Float64, Firm::NamedTuple)
-    (;α, A, δ) = Firm
-    return A * α * (L/K)^(1-α) - δ
+    (;α, Ω, δ) = Firm
+    return Ω * α * (L/K)^(1-α) - δ
 end
 export get_r
 
 function r_to_w(r::Float64, Firm::NamedTuple)
-    (;α, A, δ) = Firm
-    return A * (1 - α) * (A * α / (r + δ)) ^ (α / (1 - α))
+    (;α, Ω, δ) = Firm
+    return Ω * (1 - α) * (Ω * α / (r + δ)) ^ (α / (1 - α))
 end
 export r_to_w
 

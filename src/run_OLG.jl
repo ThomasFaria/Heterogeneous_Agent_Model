@@ -41,7 +41,7 @@ Households = @with_kw (
 
 Firms = @with_kw ( 
     α = 0.36,
-    A = 1.3193,
+    Ω = 1.3193,
     δ = 0.08,
 )
 
@@ -82,7 +82,7 @@ HHs = Households()
 KK = x.K
 LL = get_aggregate_L(x.λ, HHs)
 CC = dot(x.dr.C, x.λ)
-YY = Firm.A * KK^Firm.α * LL^(1-Firm.α)
+YY = Firm.Ω * KK^Firm.α * LL^(1-Firm.α)
 A_past = similar(x.dr.A)
 A_past[Age = 2:65] = x.dr.A[Age = 1:64]
 A_past[Age = 1] = zeros(HHs.a_size, 2)
