@@ -93,31 +93,31 @@ function get_state_value_index(mc::MarkovChain, value)
 end 
 export get_state_value_index
 
-function c_transition_OLG(a_past::Float64, a::Vector{Float64}, z::Symbol, age::Int64, r::Float64, Params::NamedTuple)
+function c_transition_OLG(a_past::Float64, a::Vector{Float64}, z::Symbol, age::Int64, r::Float64, B::Float64, Params::NamedTuple)
     (; q, z_chain) = Params
     idx = get_state_value_index(z_chain, z)
 
-    c = (1 + r) * a_past + q[age, idx] - a[begin] 
+    c = (1 + r) * a_past + q[age, idx] + B - a[begin] 
     return c
 end
 export c_transition_OLG
 
-function ubound(a_past::Float64, z::Symbol, age::Int64, r::Float64, Params::NamedTuple)
+function ubound(a_past::Float64, z::Symbol, age::Int64, r::Float64, B::Float64, Params::NamedTuple)
     (; q, z_chain, a_min) = Params
     idx = get_state_value_index(z_chain, z)
 
     # Case when you save everything, no consumption only savings
     c =  a_min
-    ub = (1 + r) * a_past + q[age, idx] - c
+    ub = (1 + r) * a_past + q[age, idx] + B - c
     ub = ifelse(ub <= a_min, a_min, ub)
 
     return [ub]
 end
 export ubound
 
-function obj_OLG(V::AxisArray{Float64, 3}, a::Vector{Float64}, a_past::Float64, z::Symbol, age::Int64, r::Float64, Params::NamedTuple)
+function obj_OLG(V::AxisArray{Float64, 3}, a::Vector{Float64}, a_past::Float64, z::Symbol, age::Int64, r::Float64, B::Float64, Params::NamedTuple)
     (; ψ, β, z_chain, a_vals, β, u, J, j_star) = Params
-    c = c_transition_OLG(a_past, a, z, age, r, Params)
+    c = c_transition_OLG(a_past, a, z, age, r, B, Params)
 
     if age == J
         VF = u(c) 
@@ -145,7 +145,7 @@ function obj_OLG(V::AxisArray{Float64, 3}, a::Vector{Float64}, a_past::Float64, 
 end
 export obj_OLG
 
-function get_dr(r::Float64, Params::NamedTuple)
+function get_dr(r::Float64, B::Float64, Params::NamedTuple)
     (; β, z_chain, z_size, a_size, a_vals, a_min, β,  J) = Params
 
     V = AxisArray(zeros(a_size, z_size, J);
@@ -175,16 +175,16 @@ function get_dr(r::Float64, Params::NamedTuple)
                 # Specify lower bound for optimisation
                 lb = [a_min]        
                 # Specify upper bound for optimisation
-                ub = ubound(a, z, j, r, Params)
+                ub = ubound(a, z, j, r, B, Params)
                 # Specify the initial value in the middle of the range
                 init = (lb + ub)/2
                 # Optimization
-                Sol = optimize(x -> -obj_OLG(V, x, a, z, j, r, Params), lb, ub, init)
+                Sol = optimize(x -> -obj_OLG(V, x, a, z, j, r, B, Params), lb, ub, init)
                 a_new = Optim.minimizer(Sol)
 
                 # Deduce optimal value function, consumption and asset
-                V[Age = j, Z = z, a = a_i] = obj_OLG(V, a_new, a, z, j, r, Params)
-                C[Age = j, Z = z, a = a_i] = c_transition_OLG(a, a_new, z, j, r, Params)
+                V[Age = j, Z = z, a = a_i] = obj_OLG(V, a_new, a, z, j, r, B, Params)
+                C[Age = j, Z = z, a = a_i] = c_transition_OLG(a, a_new, z, j, r, B, Params)
                 A[Age = j, Z = z, a = a_i] = a_new[begin]
 
             end
@@ -194,7 +194,7 @@ function get_dr(r::Float64, Params::NamedTuple)
 end
 export get_dr
 
-function simulate_OLG(dr::AxisArray{Float64, 3}, r::Float64, Params::NamedTuple; Initial_Z = 0.06, N=1)
+function simulate_OLG(dr::AxisArray{Float64, 3}, r::Float64, B::Float64, Params::NamedTuple; Initial_Z = 0.06, N=1)
     (; J, ψ, z_chain, a_vals, a_min) = Params
 
     A = AxisArray(fill(NaN, (J, N));
@@ -251,6 +251,7 @@ function simulate_OLG(dr::AxisArray{Float64, 3}, r::Float64, Params::NamedTuple;
                                                     Z[Age = j, N = n], 
                                                     j,
                                                     r, 
+                                                    B,
                                                     Params)
             end
         end

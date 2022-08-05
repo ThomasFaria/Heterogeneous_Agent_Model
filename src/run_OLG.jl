@@ -46,6 +46,7 @@ Firms = @with_kw (
 Firm = Firms();
 r = 0.04
 w = r_to_w(r, Firm)
+B = 3
 Policies = Policy()
 HHs = Households();
 
