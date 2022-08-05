@@ -1,5 +1,7 @@
 using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Serialization, StatsPlots, AxisArrays
 
+
+
 Policy = @with_kw (
                     ξ = 0.4,
                     θ = 0.3,
@@ -8,8 +10,6 @@ Policy = @with_kw (
 )    
 
 Households = @with_kw ( 
-                    r = 0.04, # interest rate
-                    w = 1.,
                     death_age = 85,
                     retirement_age = 65,
                     age_start_work = 21,
@@ -25,8 +25,8 @@ Households = @with_kw (
                     γ = 2., # Constant relative risk aversion (consumption utility)
                     Σ = 1., # Constant relative risk aversion (asset utility)
                     β = 1.011,
-                    z_chain = MarkovChain([0.94 0.06;
-                                           0.94 0.06], 
+                    z_chain = MarkovChain([0.06 0.94;
+                                           0.06 0.94], 
                                         [:U; :E]),
                     a_min = 1e-10,
                     a_max = 15.,
@@ -43,9 +43,12 @@ Firms = @with_kw (
     δ = 0.08,
 )
 
+Firm = Firms();
+r = 0.04
+w = r_to_w(r, Firm)
 Policies = Policy()
 HHs = Households();
-Firm = Firms();
+
 
 using ProgressBars, Printf
 # Initial values
@@ -54,41 +57,77 @@ Firm = Firms();
 HHs = Households();
 L = 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ)
 K = 3.
-maxit = 100
-η_tol = 1e-4
 
-η0 = 1.0
-iter = ProgressBar(1:maxit)
-for n in iter
-    ## Firm 
-    r = get_r(K, L, Firm)
-    w = get_w(K, L, Firm)
+function solve_equilibrium(K0::Float64, L0::Float64, Firm::NamedTuple, Households::NamedTuple ; N=2000, maxit=300, η_tol1=1e-3, α1::Float64)
+    η0 = 1.0
+    iter = ProgressBar(1:maxit)
+    for n in iter
+        ## Firm 
+        r = get_r(K0, L0, Firm)
+        w = r_to_w(r, Firm)
 
-    # Households 
-    HHs = Households(r = r, w = w);
-    dr = get_dr(HHs)
-    sim = simulate_OLG(dr.A, HHs, N=2000);
-    λ = get_ergodic_distribution(sim, HHs, PopScaled = true)
+        # Households 
+        HHs = Households;
+        dr = get_dr(r, HHs)
+        sim = simulate_OLG(dr.A, r, HHs, N=N);
+        λ = get_ergodic_distribution(sim, HHs, PopScaled = true)
 
-    # Aggregation
-    K1 = get_aggregate_K(λ,  dr.A)
-    L1 = get_aggregate_L(λ, HHs)
+        # Aggregation
+        K1 = get_aggregate_K(λ,  dr.A)
+        # L1 = get_aggregate_L(λ, HHs)
 
-    η = maximum(abs, K1 - K)
+        η = abs(K1 - K0)/K0 
 
-    λ = η/η0
-    η0 = η
+        λ0 = η/η0
+        η0 = η
 
-    if η<η_tol
-        println("\n Algorithm stopped after iteration ", n, ", with μ = ", λ, "\n")
-        return (λ=λ, dr=dr, sim=sim, K=K1, L=L1)
+        if η<η_tol1
+            println("\n Algorithm stopped after iteration ", n, ", with μ = ", λ0, "\n")
+            return (λ=λ, dr=dr, sim=sim, K=K1, r=r, w=w)
+        end
+
+        K0 = α1 * K0 + (1 - α1)
+        # L = L1
+        set_postfix(iter, η=@sprintf("%.8f", η), λ=@sprintf("%.8f", λ0))
     end
-
-    K = (K1 + K)/2
-    L = L1
-
-    set_postfix(iter, η=@sprintf("%.8f", η), λ=@sprintf("%.8f", λ))
 end
+
+
+x = solve_equilibrium(
+    4.035704164774694, 
+    0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ),
+    Firm, 
+    Households()
+    )
+
+get_r(x.K, 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ), Firm)
+
+x.K
+plot(x.dr.V[Age = 65])
+
+bar(HHs.a_vals, sum(x.λ[Age = 60] / HHs.μ[60], dims=2))
+bar!(HHs.a_vals,sum(x.λ[Age = 54] / HHs.μ[54], dims=2))
+bar!(HHs.a_vals, sum(x.λ[Age = 50] / HHs.μ[50], dims=2))
+bar!(HHs.a_vals, sum(x.λ[Age = 44] / HHs.μ[44], dims=2))
+
+r = get_r(x.K, 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ), Firm)
+w = r_to_w(r, Firm)
+
+HHs = Households()
+KK = x.K
+LL = get_aggregate_L(x.λ, HHs)
+CC = dot(x.dr.C, x.λ)
+YY = Firm.A * KK^Firm.α * LL^(1-Firm.α)
+A_past = similar(x.dr.A)
+A_past[Age = 2:65] = x.dr.A[Age = 1:64]
+A_past[Age = 1] = zeros(HHs.a_size, 2)
+KK_past = get_aggregate_K(x.λ, A_past)
+
+
+CC + KK - YY - (1 - Firm.δ) * KK_past
+
+
+
 
 dr = get_dr(pm)
 sim = simulate_OLG(dr.A, pm, N=10000);
