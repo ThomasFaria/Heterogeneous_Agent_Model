@@ -326,8 +326,12 @@ function r_to_w(r::Float64, Firm::NamedTuple)
 end
 export r_to_w
 
-function get_aggregate_K(λ::AxisArray{Float64, 3},  A::AxisArray{Float64, 3})
-    return dot(A, λ)
+function get_aggregate_K(λ::AxisArray{Float64, 3},  A::AxisArray{Float64, 3}, Params::NamedTuple)
+    (; a_size, z_size, J) = Params
+    A_past = similar(A)
+    A_past[Age = 2:J] = A[Age = 1:J-1]
+    A_past[Age = 1] = zeros(a_size, z_size)
+    return dot(A_past, λ)
 end
 export get_aggregate_K
 
