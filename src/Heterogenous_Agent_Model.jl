@@ -347,6 +347,50 @@ function get_aggregate_B(λ::AxisArray{Float64, 3},  A::AxisArray{Float64, 3}, P
 end
 export get_aggregate_B
 
+function solve_equilibrium(K0::Float64, L0::Float64, B0::Float64, Firms::NamedTuple, Households::NamedTuple ; N=2000, maxit=300, η_tol_K=1e-3, η_tol_B=1e-3, α_K=0.33, α_B=0.33)
+    η0_K = 1.0
+    η0_B = 1.0
+    Firm = Firms
+    iter = ProgressBar(1:maxit)
+    for n in iter
+        ## Firm 
+        r = get_r(K0, L0, Firm)
+        w = r_to_w(r, Firm)
+
+        # Households 
+        HHs = Households;
+        dr = get_dr(r, B0, HHs)
+        sim = simulate_OLG(dr.A, r, B0, HHs, N=N);
+        λ = get_ergodic_distribution(sim, HHs, PopScaled = true)
+
+        # Aggregation
+        K1 = get_aggregate_K(λ,  dr.A, HHs)
+        B1 = get_aggregate_B(λ,  dr.A, HHs)
+        # L1 = get_aggregate_L(λ, HHs)
+
+        η_K = abs(K1 - K0)/K0 
+        η_B = abs(B1 - B0)/B0 
+
+        λ_K = η_K/η0_K
+        λ_B = η_B/η0_B
+
+        η0_K = η_K
+        η0_B = η_B
+
+        if (η_K<η_tol_K) & (η_B<η_tol_B)
+            println("\n Algorithm stopped after iteration ", n, "\n")
+        B1 = get_aggregate_B(λ,  dr.A, HHs)
+            return (λ=λ, dr=dr, sim=sim, K=K1, B = B1, r=r, w=w)
+        end
+
+        K0 = α_K * K0 + (1 - α_K) * K1
+        B0 = α_B * B0 + (1 - α_B) * B1
+
+        # L = L1
+        set_postfix(iter, η_K=@sprintf("%.8f", η_K), η_B=@sprintf("%.8f", η_B), λ_K=@sprintf("%.8f", λ_K), λ_B=@sprintf("%.8f", λ_B))
+    end
+end
+export solve_equilibrium
 
 ### Old model
 
