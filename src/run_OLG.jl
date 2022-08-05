@@ -1,6 +1,8 @@
 using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Serialization, StatsPlots, AxisArrays
-
-
+# TODO : Calculer l'équilibre général refaire le calcul de K
+# TODO : Simplifier les AxisArray pour les retraités
+# TODO : Equilibrer les taxes pour l'équilibre générale
+# TODO : Rajouter le taux de croissance de la pop
 
 Policy = @with_kw (
                     ξ = 0.4,
@@ -43,63 +45,23 @@ Firms = @with_kw (
     δ = 0.08,
 )
 
+# Initial values
 Firm = Firms();
 r = 0.04
 w = r_to_w(r, Firm)
 B = 3
 Policies = Policy()
 HHs = Households();
-
-
-using ProgressBars, Printf
-# Initial values
-Policies = Policy();
-Firm = Firms();
-HHs = Households();
 L = 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ)
 K = 3.
 
-function solve_equilibrium(K0::Float64, L0::Float64, Firm::NamedTuple, Households::NamedTuple ; N=2000, maxit=300, η_tol1=1e-3, α1::Float64)
-    η0 = 1.0
-    iter = ProgressBar(1:maxit)
-    for n in iter
-        ## Firm 
-        r = get_r(K0, L0, Firm)
-        w = r_to_w(r, Firm)
-
-        # Households 
-        HHs = Households;
-        dr = get_dr(r, HHs)
-        sim = simulate_OLG(dr.A, r, HHs, N=N);
-        λ = get_ergodic_distribution(sim, HHs, PopScaled = true)
-
-        # Aggregation
-        K1 = get_aggregate_K(λ,  dr.A)
-        # L1 = get_aggregate_L(λ, HHs)
-
-        η = abs(K1 - K0)/K0 
-
-        λ0 = η/η0
-        η0 = η
-
-        if η<η_tol1
-            println("\n Algorithm stopped after iteration ", n, ", with μ = ", λ0, "\n")
-            return (λ=λ, dr=dr, sim=sim, K=K1, r=r, w=w)
-        end
-
-        K0 = α1 * K0 + (1 - α1)
-        # L = L1
-        set_postfix(iter, η=@sprintf("%.8f", η), λ=@sprintf("%.8f", λ0))
-    end
-end
-
-
 x = solve_equilibrium(
-    4.035704164774694, 
+    4.2929306960632285, 
     0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ),
-    Firm, 
+    0.05198993101861361,
+    Firms(), 
     Households()
-    )
+)
 
 get_r(x.K, 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ), Firm)
 
