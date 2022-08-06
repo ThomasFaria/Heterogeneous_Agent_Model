@@ -50,23 +50,23 @@ Firms = @with_kw (
 Firm = Firms();
 r = 0.02
 w = r_to_w(r, Firm)
+τ_ssc = 0.1
+τ_u = 0.1
 Policies = Policy()
 HHs = Households();
-L = 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ)
-K = 4.109594198432264
-B = 0.0499048281549706
+L0 = 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ)
+
+
+K = 3.
+B = 1.
 
 x = solve_equilibrium(
     K, 
-    L,
     B,
-    Firms(), 
-    Households(),
-    Policy(),
-    N=500,
-    η_tol_K=1e-1, 
-    η_tol_B=1e-1
+    η_tol_K=1e-3,
+    η_tol_B=1e-3
 )
+
 
 get_r(x.K, 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ), Firm)
 
