@@ -1,6 +1,6 @@
 module Heterogenous_Agent_Model
 
-using LinearAlgebra, Statistics, Interpolations, Optim, ProgressBars, Printf, QuantEcon, CSV, NLsolve, AxisArrays, Distributions, DataStructures
+using LinearAlgebra, Statistics, Interpolations, Optim, ProgressBars, Printf, QuantEcon, CSV, NLsolve, AxisArrays, Distributions, DataStructures, Parameters
 
 
 function import_aging_prob(age_min::Int64, age_max::Int64)
@@ -64,8 +64,7 @@ function get_wages(ϵ::Vector{Float64}, h::Float64, w::Float64, Policy::NamedTup
 end
 export get_wages
 
-function get_dispo_income(W::Matrix{Float64}, b::Vector{Float64}, j_star::Int64, Policy::NamedTuple)
-    (; τ_ssc, τ_u) = Policy
+function get_dispo_income(W::Matrix{Float64}, b::Vector{Float64}, j_star::Int64, τ_ssc::Float64, τ_u::Float64)
     q = zeros(size(b, 1), 2)
 
     q[begin:j_star-1,1] = W[:,1]
@@ -389,11 +388,70 @@ function get_aggregate_Y(λ::AxisArray{Float64, 3},  A::AxisArray{Float64, 3}, F
 end
 export get_aggregate_Y
 
-function solve_equilibrium(K0::Float64, L0::Float64, B0::Float64, Firms::NamedTuple, Households::NamedTuple, Policy::NamedTuple ; N=2000, maxit=300, η_tol_K=1e-3, η_tol_B=1e-3, α_K=0.4, α_B=0.4)
+function check_GE(dr::NamedTuple, λ::AxisArray{Float64, 3}, Households::NamedTuple, Firms::NamedTuple)
+    # Consumption
+    C = get_aggregate_C(λ,  dr.C)
+    # Investment
+    I = get_aggregate_I(λ,  dr.A, Firms, Households)
+    # Output
+    Y = get_aggregate_Y(λ,  dr.A, Firms, Households)
+    return Y - (C + I)
+end
+export check_GE
+
+function solve_equilibrium(K0::Float64, B0::Float64; N=2000, maxit=300, η_tol_K=1e-3, η_tol_B=1e-3, α_K=0.4, α_B=0.4)
+    
+    Policy = @with_kw (
+        ξ = 0.4,
+        θ = 0.3,
+    )    
+
+    Households = @with_kw ( 
+            death_age = 85,
+            retirement_age = 65,
+            age_start_work = 21,
+            h = 0.45,
+            j_star = retirement_age - age_start_work + 1,
+            J = death_age - age_start_work + 1,
+            ψ = import_aging_prob(age_start_work, death_age), # Probabilities to survive
+            μ = get_pop_distrib(ψ), # Population distribution
+            ϵ = get_efficiency(age_start_work, retirement_age - 1), #Efficiency index
+            b = get_soc_sec_benefit(ϵ, h, w, j_star, J, Policies),
+            W = get_wages(ϵ, h, w, Policies),
+            q = get_dispo_income(W, b, j_star, τ_ssc, τ_u),
+            γ = 2., # Constant relative risk aversion (consumption utility)
+            Σ = 1., # Constant relative risk aversion (asset utility)
+            β = 1.011,
+            z_chain = MarkovChain([0.06 0.94;
+                                0.06 0.94], 
+                                [:U; :E]),
+            a_min = 1e-10,
+            a_max = 15.,
+            a_size = 100,
+            a_vals = range(a_min, a_max, length = a_size),
+            z_size = length(z_chain.state_values),
+            u = γ == 1 ? c -> log(c) : c -> (c^(1 - γ)) / (1 - γ),
+            # U = Σ == 1 ? a -> log(a) : a -> (a^(1 - Σ)) / (1 - Σ),
+    )
+
+    Firms = @with_kw ( 
+        α = 0.36,
+        Ω = 1.3193,
+        δ = 0.08,
+    )
+    
+    # Initial values
+    Firm = Firms();
+    r = 0.04
+    w = r_to_w(r, Firm)
+    τ_ssc = 0.1
+    τ_u = 0.01
+    Policies = Policy()
+    HHs = Households();
+    L0 = 0.35
+
     η0_K = 1.0
     η0_B = 1.0
-    Firm = Firms
-    Policies = Policy
     iter = ProgressBar(1:maxit)
     for n in iter
         ## Firm 
@@ -401,18 +459,21 @@ function solve_equilibrium(K0::Float64, L0::Float64, B0::Float64, Firms::NamedTu
         w = r_to_w(r, Firm)
 
         # Households 
-        HHs = Households;
         dr = get_dr(r, B0, HHs)
         sim = simulate_OLG(dr.A, r, B0, HHs, N=N);
         λ = get_ergodic_distribution(sim, HHs, PopScaled = true)
 
         # Aggregation
-        K1 = get_aggregate_K(λ,  dr.A, HHs)
-        B1 = get_aggregate_B(λ,  dr.A, HHs)
+        K1 = get_aggregate_K(λ, dr.A, HHs)
+        B1 = get_aggregate_B(λ, dr.A, HHs)
+        L1 = get_aggregate_L(λ, HHs)
 
         # Policies
-        # Policies.τ_ssc = get_SSC_rate(λ, w, HHs)
-        # Policies.τ_u = get_U_benefit_rate(λ, w, HHs, Policies)
+        τ_ssc = get_SSC_rate(λ, w, HHs)
+        τ_u = get_U_benefit_rate(λ, w, HHs, Policies)
+        
+        ## Update Households 
+        HHs = Households();
 
         η_K = abs(K1 - K0) 
         η_B = abs(B1 - B0) 
@@ -425,15 +486,15 @@ function solve_equilibrium(K0::Float64, L0::Float64, B0::Float64, Firms::NamedTu
 
         if (η_K<η_tol_K) & (η_B<η_tol_B)
             println("\n Algorithm stopped after iteration ", n, "\n")
-        B1 = get_aggregate_B(λ,  dr.A, HHs)
-            return (λ=λ, dr=dr, sim=sim, K=K1, B = B1, r=r, w=w)
+            check_GE(dr, λ, HHs, Firm) > 0.001  && @warn "Markets are not clearing"
+            return (λ=λ, dr=dr, sim=sim, K=K1, B = B1, r=r, w=w, HH = HHs, τ_ssc=τ_ssc, τ_u=τ_u)
         end
-
+        println("Convergence : ", check_GE(dr, λ, HHs, Firm))
         K0 = α_K * K0 + (1 - α_K) * K1
         B0 = α_B * B0 + (1 - α_B) * B1
+        L0 = L1
 
-        # L = L1
-        set_postfix(iter, η_K=@sprintf("%.8f", η_K), η_B=@sprintf("%.8f", η_B), λ_K=@sprintf("%.8f", λ_K), λ_B=@sprintf("%.8f", λ_B))
+        set_postfix(iter, K=@sprintf("%.4f", K1), B=@sprintf("%.4f", B1), CV=@sprintf("%.4f", τ_ssc), η_K=@sprintf("%.4f", η_K), λ_K=@sprintf("%.4f", λ_K))
     end
 end
 export solve_equilibrium
