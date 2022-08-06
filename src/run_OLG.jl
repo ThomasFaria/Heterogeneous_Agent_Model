@@ -1,8 +1,8 @@
 using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Serialization, StatsPlots, AxisArrays
-# TODO : Calculer l'équilibre général refaire le calcul de K
-# TODO : Simplifier les AxisArray pour les retraités
 # TODO : Equilibrer les taxes pour l'équilibre générale
+# TODO : Simplifier les AxisArray pour les retraités
 # TODO : Rajouter le taux de croissance de la pop
+# TODO : Calculer le welfare pour policy
 
 Policy = @with_kw (
                     ξ = 0.4,
@@ -41,13 +41,14 @@ Households = @with_kw (
 
 Firms = @with_kw ( 
     α = 0.36,
-    Ω = 1.3193,
+    Ω = 1.3175, #1.3193,
     δ = 0.08,
 )
 
+
 # Initial values
 Firm = Firms();
-r = 0.04
+r = 0.02
 w = r_to_w(r, Firm)
 Policies = Policy()
 HHs = Households();
@@ -60,10 +61,32 @@ x = solve_equilibrium(
     L,
     B,
     Firms(), 
-    Households()
+    Households(),
+    Policy(),
+    N=500,
+    η_tol_K=1e-1, 
+    η_tol_B=1e-1
 )
 
 get_r(x.K, 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ), Firm)
+
+
+CC = get_aggregate_C(x.λ,  x.dr.C)
+II = get_aggregate_I(x.λ,  x.dr.A, Firm, HHs)
+YY = get_aggregate_Y(x.λ,  x.dr.A, Firm, HHs)
+
+YY - CC - II
+
+dot(x.dr.C, x.λ)
+
+function check_GE(dr::NamedTuple, λ::AxisArray{Float64, 3},)
+    # Consumption
+    # Investment
+    # Output
+
+end
+
+
 
 x.K
 x.B
@@ -74,6 +97,12 @@ bar(HHs.a_vals, sum(x.λ[Age = 60] / HHs.μ[60], dims=2))
 bar!(HHs.a_vals,sum(x.λ[Age = 54] / HHs.μ[54], dims=2))
 bar!(HHs.a_vals, sum(x.λ[Age = 50] / HHs.μ[50], dims=2))
 bar!(HHs.a_vals, sum(x.λ[Age = 44] / HHs.μ[44], dims=2))
+
+bar(HHs.a_vals, sum(x.λ[Age = 60], dims=2))
+bar!(HHs.a_vals,sum(x.λ[Age = 54], dims=2))
+bar!(HHs.a_vals, sum(x.λ[Age = 50], dims=2))
+bar!(HHs.a_vals, sum(x.λ[Age = 44], dims=2))
+
 
 r = get_r(x.K, 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ), Firm)
 w = r_to_w(r, Firm)
