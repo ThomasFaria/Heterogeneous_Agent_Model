@@ -45,30 +45,28 @@ end
 export get_efficiency
 
 
-function get_soc_sec_benefit(ϵ::Vector{Float64}, h::Float64, w::Float64, j_star::Int64, J::Int64, Policy::NamedTuple)
+function get_soc_sec_benefit(w::Float64, Households::NamedTuple, Policy::NamedTuple)
     (; θ) = Policy
+    (; ϵ, h, j_star, J) = Households
+
     W = w * h * ϵ
     b  = zeros(J)
     b[j_star:end] .= θ * mean(W)
+
     return b
 end
 export get_soc_sec_benefit
 
-function get_wages(ϵ::Vector{Float64}, h::Float64, w::Float64, Policy::NamedTuple)
-    (; ξ) = Policy
-    W = zeros(size(ϵ, 1), 2)
+function get_dispo_income(w::Float64, Households::NamedTuple, Policy::NamedTuple)
+    (; ξ, τ_ssc, τ_u) = Policy
+    (; ϵ, h, j_star) = Households
 
-    W[:,1] .= w * h * ξ
-    W[:,2] = w * h * ϵ
-    return W
-end
-export get_wages
+    b = get_soc_sec_benefit(w, Households, Policy)
 
-function get_dispo_income(W::Matrix{Float64}, b::Vector{Float64}, j_star::Int64, τ_ssc::Float64, τ_u::Float64)
     q = zeros(size(b, 1), 2)
 
-    q[begin:j_star-1,1] = W[:,1]
-    q[begin:j_star-1,2] = (1 - τ_ssc - τ_u) * W[:,2]
+    q[begin:j_star-1,1] .= w * h * ξ
+    q[begin:j_star-1,2] = (1 - τ_ssc - τ_u) * w * h * ϵ
     q[j_star:end,:] .= b[j_star:end]
     return q
 end
@@ -92,18 +90,20 @@ function get_state_value_index(mc::MarkovChain, value)
 end 
 export get_state_value_index
 
-function c_transition_OLG(a_past::Float64, a::Vector{Float64}, z::Symbol, age::Int64, r::Float64, B::Float64, Params::NamedTuple)
-    (; q, z_chain) = Params
+function c_transition_OLG(a_past::Float64, a::Vector{Float64}, z::Symbol, age::Int64, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
+    (; z_chain) = Params
     idx = get_state_value_index(z_chain, z)
+    q = get_dispo_income(w, Params, Policy)
 
     c = (1 + r) * a_past + q[age, idx] + B - a[begin] 
     return c
 end
 export c_transition_OLG
 
-function ubound(a_past::Float64, z::Symbol, age::Int64, r::Float64, B::Float64, Params::NamedTuple)
-    (; q, z_chain, a_min) = Params
+function ubound(a_past::Float64, z::Symbol, age::Int64, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
+    (; z_chain, a_min) = Params
     idx = get_state_value_index(z_chain, z)
+    q = get_dispo_income(w, Params, Policy)
 
     # Case when you save everything, no consumption only savings
     c =  a_min
@@ -114,9 +114,9 @@ function ubound(a_past::Float64, z::Symbol, age::Int64, r::Float64, B::Float64, 
 end
 export ubound
 
-function obj_OLG(V::AxisArray{Float64, 3}, a::Vector{Float64}, a_past::Float64, z::Symbol, age::Int64, r::Float64, B::Float64, Params::NamedTuple)
+function obj_OLG(V::AxisArray{Float64, 3}, a::Vector{Float64}, a_past::Float64, z::Symbol, age::Int64, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
     (; ψ, β, z_chain, a_vals, β, u, J, j_star) = Params
-    c = c_transition_OLG(a_past, a, z, age, r, B, Params)
+    c = c_transition_OLG(a_past, a, z, age, r, w, B, Params, Policy)
 
     if age == J
         VF = u(c) 
@@ -144,7 +144,7 @@ function obj_OLG(V::AxisArray{Float64, 3}, a::Vector{Float64}, a_past::Float64, 
 end
 export obj_OLG
 
-function get_dr(r::Float64, B::Float64, Params::NamedTuple)
+function get_dr(r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
     (; β, z_chain, z_size, a_size, a_vals, a_min, β,  J) = Params
 
     V = AxisArray(zeros(a_size, z_size, J);
@@ -165,7 +165,7 @@ function get_dr(r::Float64, B::Float64, Params::NamedTuple)
     )
 
     # Loop over ages recursively
-    for j ∈ J:-1:1
+    for j ∈ ProgressBar(J:-1:1)
         # Loop over past assets
         for a_i ∈ 1:a_size
             a = a_vals[a_i]
@@ -174,16 +174,16 @@ function get_dr(r::Float64, B::Float64, Params::NamedTuple)
                 # Specify lower bound for optimisation
                 lb = [a_min]        
                 # Specify upper bound for optimisation
-                ub = ubound(a, z, j, r, B, Params)
+                ub = ubound(a, z, j, r, w, B, Params, Policy)
                 # Specify the initial value in the middle of the range
                 init = (lb + ub)/2
                 # Optimization
-                Sol = optimize(x -> -obj_OLG(V, x, a, z, j, r, B, Params), lb, ub, init)
+                Sol = optimize(x -> -obj_OLG(V, x, a, z, j, r, w, B, Params, Policy), lb, ub, init)
                 a_new = Optim.minimizer(Sol)
 
                 # Deduce optimal value function, consumption and asset
-                V[Age = j, Z = z, a = a_i] = obj_OLG(V, a_new, a, z, j, r, B, Params)
-                C[Age = j, Z = z, a = a_i] = c_transition_OLG(a, a_new, z, j, r, B, Params)
+                V[Age = j, Z = z, a = a_i] = obj_OLG(V, a_new, a, z, j, r, w, B, Params, Policy)
+                C[Age = j, Z = z, a = a_i] = c_transition_OLG(a, a_new, z, j, r, w, B, Params, Policy)
                 A[Age = j, Z = z, a = a_i] = a_new[begin]
 
             end
@@ -193,7 +193,7 @@ function get_dr(r::Float64, B::Float64, Params::NamedTuple)
 end
 export get_dr
 
-function simulate_OLG(dr::AxisArray{Float64, 3}, r::Float64, B::Float64, Params::NamedTuple; Initial_Z = 0.06, N=1)
+function simulate_OLG(dr::AxisArray{Float64, 3}, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple; Initial_Z = 0.06, N=1)
     (; J, ψ, z_chain, a_vals, a_min) = Params
 
     A = AxisArray(fill(NaN, (J, N));
@@ -211,7 +211,7 @@ function simulate_OLG(dr::AxisArray{Float64, 3}, r::Float64, B::Float64, Params:
     N = 1:N
     );
 
-    for n ∈ 1:N
+    for n ∈ ProgressBar(1:N)
         for j ∈ 1:J
 
             if j == 1
@@ -250,8 +250,10 @@ function simulate_OLG(dr::AxisArray{Float64, 3}, r::Float64, B::Float64, Params:
                                                     Z[Age = j, N = n], 
                                                     j,
                                                     r, 
+                                                    w, 
                                                     B,
-                                                    Params)
+                                                    Params, 
+                                                    Policy)
             end
         end
     end
@@ -325,8 +327,11 @@ function r_to_w(r::Float64, Firm::NamedTuple)
 end
 export r_to_w
 
-function get_SSC_rate(λ::AxisArray{Float64, 3}, w::Float64, Params::NamedTuple)
-    (; j_star, J, h, ϵ, b) = Params
+function get_SSC_rate(λ::AxisArray{Float64, 3}, w::Float64, Params::NamedTuple, Policy::NamedTuple)
+    (; j_star, J, h, ϵ) = Params
+
+    b = get_soc_sec_benefit(w, Params, Policy)
+
     SSC = sum(λ[Age = j_star:J]) * b[j_star]
     tax_base = sum(λ[Age = 1:j_star-1, Z = :E] * ϵ ) * w * h
     return SSC/tax_base
@@ -399,56 +404,12 @@ function check_GE(dr::NamedTuple, λ::AxisArray{Float64, 3}, Households::NamedTu
 end
 export check_GE
 
-function solve_equilibrium(K0::Float64, B0::Float64; N=2000, maxit=300, η_tol_K=1e-3, η_tol_B=1e-3, α_K=0.4, α_B=0.4)
-    
-    Policy = @with_kw (
-        ξ = 0.4,
-        θ = 0.3,
-    )    
-
-    Households = @with_kw ( 
-            death_age = 85,
-            retirement_age = 65,
-            age_start_work = 21,
-            h = 0.45,
-            j_star = retirement_age - age_start_work + 1,
-            J = death_age - age_start_work + 1,
-            ψ = import_aging_prob(age_start_work, death_age), # Probabilities to survive
-            μ = get_pop_distrib(ψ), # Population distribution
-            ϵ = get_efficiency(age_start_work, retirement_age - 1), #Efficiency index
-            b = get_soc_sec_benefit(ϵ, h, w, j_star, J, Policies),
-            W = get_wages(ϵ, h, w, Policies),
-            q = get_dispo_income(W, b, j_star, τ_ssc, τ_u),
-            γ = 2., # Constant relative risk aversion (consumption utility)
-            Σ = 1., # Constant relative risk aversion (asset utility)
-            β = 1.011,
-            z_chain = MarkovChain([0.06 0.94;
-                                0.06 0.94], 
-                                [:U; :E]),
-            a_min = 1e-10,
-            a_max = 15.,
-            a_size = 100,
-            a_vals = range(a_min, a_max, length = a_size),
-            z_size = length(z_chain.state_values),
-            u = γ == 1 ? c -> log(c) : c -> (c^(1 - γ)) / (1 - γ),
-            # U = Σ == 1 ? a -> log(a) : a -> (a^(1 - Σ)) / (1 - Σ),
-    )
-
-    Firms = @with_kw ( 
-        α = 0.36,
-        Ω = 1.3193,
-        δ = 0.08,
-    )
+function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Households, Policy; N=2000, maxit=300, η_tol_K=1e-3, η_tol_B=1e-3, α_K=0.4, α_B=0.4)
     
     # Initial values
-    Firm = Firms();
-    r = 0.04
-    w = r_to_w(r, Firm)
-    τ_ssc = 0.1
-    τ_u = 0.01
-    Policies = Policy()
-    HHs = Households();
-    L0 = 0.35
+    Firm = Firms;
+    Policies = Policy
+    HHs = Households
 
     η0_K = 1.0
     η0_B = 1.0
@@ -459,8 +420,8 @@ function solve_equilibrium(K0::Float64, B0::Float64; N=2000, maxit=300, η_tol_K
         w = r_to_w(r, Firm)
 
         # Households 
-        dr = get_dr(r, B0, HHs)
-        sim = simulate_OLG(dr.A, r, B0, HHs, N=N);
+        dr = get_dr(r, w, B0, HHs, Policies)
+        sim = simulate_OLG(dr.A, r, w, B0, HHs, Policies, N=N);
         λ = get_ergodic_distribution(sim, HHs, PopScaled = true)
 
         # Aggregation
@@ -469,11 +430,9 @@ function solve_equilibrium(K0::Float64, B0::Float64; N=2000, maxit=300, η_tol_K
         L1 = get_aggregate_L(λ, HHs)
 
         # Policies
-        τ_ssc = get_SSC_rate(λ, w, HHs)
+        τ_ssc = get_SSC_rate(λ, w, HHs, Policies)
         τ_u = get_U_benefit_rate(λ, w, HHs, Policies)
         
-        ## Update Households 
-        HHs = Households();
 
         η_K = abs(K1 - K0) 
         η_B = abs(B1 - B0) 

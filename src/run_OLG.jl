@@ -23,9 +23,6 @@ Households = @with_kw (
                     ψ = import_aging_prob(age_start_work, death_age), # Probabilities to survive
                     μ = get_pop_distrib(ψ), # Population distribution
                     ϵ = get_efficiency(age_start_work, retirement_age - 1), #Efficiency index
-                    b = get_soc_sec_benefit(ϵ, h, w, j_star, J, Policies),
-                    W = get_wages(ϵ, h, w, Policies),
-                    q = get_dispo_income(W, b, j_star, Policies),
                     γ = 2., # Constant relative risk aversion (consumption utility)
                     Σ = 1., # Constant relative risk aversion (asset utility)
                     β = 1.011,
@@ -46,6 +43,11 @@ Firms = @with_kw (
     Ω = 1.3175, #1.3193,
     δ = 0.08,
 )
+
+b = get_soc_sec_benefit(ϵ, h, w, j_star, J, Policies),
+W = get_wages(ϵ, h, w, Policies),
+q = get_dispo_income(W, b, j_star, Policies),
+
 
 
 # Initial values
