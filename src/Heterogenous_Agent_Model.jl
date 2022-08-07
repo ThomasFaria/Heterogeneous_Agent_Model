@@ -214,18 +214,27 @@ function simulate_model(dr::AxisArray{Float64, 3}, r::Float64, w::Float64, B::Fl
         for j ∈ 1:J
 
             if j == 1
-                # In age 1, agent holds 0 asset and so doesn't consume
-                a = a_min
-                c = a_min
+                # In age 0, agent holds 0 asset
+                a_0 = a_min
+
                 # Draw the employment state
                 prob2Unemp = Binomial(1, Initial_Z)
                 IsUnem = Bool(rand(prob2Unemp, 1)[begin])
                 z = ifelse(IsUnem, :U, :E)
 
-                # Saving the results    
-                A[Age = j, N = n] = a
-                C[Age = j, N = n] = c
-                Z[Age = j, N = n] = z
+                # Saving the results
+                Z[Age = j, N = n] = z    
+                A[Age = j, N = n] = CubicSplineInterpolation(a_vals, dr[Z = Z[Age = j, N = n], Age = j], extrapolation_bc = Line())(a_0)
+                C[Age = j, N = n] = c_transition(a_0, 
+                                                [A[Age = j, N = n]], 
+                                                Z[Age = j, N = n], 
+                                                j,
+                                                r, 
+                                                w, 
+                                                B,
+                                                Params, 
+                                                Policy
+                                                )
             else
                 # Draw the survival outcome
                 prob2survive = Binomial(1, ψ[j])
