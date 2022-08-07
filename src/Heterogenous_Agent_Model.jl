@@ -130,13 +130,13 @@ function obj(V::AxisArray{Float64, 3}, a::Vector{Float64}, a_past::Float64, z::S
         # Initialise the expectation
         Ev_new = 0
         for z_next ∈ z_chain.state_values
-            π = state_transition(z_next, z, Params)
+            π_ = state_transition(z_next, z, Params)
             # # Extract the value function a skill given for the next shock
             v = V[Age = age + 1, Z = z_next]
             # Interpolate the value function on the asset for the following state
             v_new = CubicSplineInterpolation(a_vals, v, extrapolation_bc = Line())(a[begin])
             # Compute the expectation
-            Ev_new += v_new * π
+            Ev_new += v_new * π_
         end
         VF = u(c) + β* ψ[age + 1] * Ev_new
     end
@@ -167,24 +167,23 @@ function get_dr(r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::
     # Loop over ages recursively
     for j ∈ ProgressBar(J:-1:1)
         # Loop over past assets
-        for a_i ∈ 1:a_size
-            a = a_vals[a_i]
+        for (a_past_i, a_past) ∈ enumerate(a_vals)
             # Loop over idiosync shock
             for z ∈ z_chain.state_values
                 # Specify lower bound for optimisation
                 lb = [a_min]        
                 # Specify upper bound for optimisation
-                ub = ubound(a, z, j, r, w, B, Params, Policy)
+                ub = ubound(a_past, z, j, r, w, B, Params, Policy)
                 # Specify the initial value in the middle of the range
                 init = (lb + ub)/2
                 # Optimization
-                Sol = optimize(x -> -obj(V, x, a, z, j, r, w, B, Params, Policy), lb, ub, init)
-                a_new = Optim.minimizer(Sol)
+                Sol = optimize(x -> -obj(V, x, a_past, z, j, r, w, B, Params, Policy), lb, ub, init)
+                a = Optim.minimizer(Sol)
 
                 # Deduce optimal value function, consumption and asset
-                V[Age = j, Z = z, a = a_i] = obj(V, a_new, a, z, j, r, w, B, Params, Policy)
-                C[Age = j, Z = z, a = a_i] = c_transition(a, a_new, z, j, r, w, B, Params, Policy)
-                A[Age = j, Z = z, a = a_i] = a_new[begin]
+                V[Age = j, Z = z, a = a_past_i] = obj(V, a, a_past, z, j, r, w, B, Params, Policy)
+                C[Age = j, Z = z, a = a_past_i] = c_transition(a_past, a, z, j, r, w, B, Params, Policy)
+                A[Age = j, Z = z, a = a_past_i] = a[begin]
 
             end
         end
