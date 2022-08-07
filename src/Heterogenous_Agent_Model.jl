@@ -72,7 +72,7 @@ function get_dispo_income(w::Float64, Households::NamedTuple, Policy::NamedTuple
 end
 export get_dispo_income
 
-function state_transition_OLG(z_next::Symbol, z::Symbol, Params::NamedTuple)
+function state_transition(z_next::Symbol, z::Symbol, Params::NamedTuple)
     (; z_chain) = Params
 
     # Get the index of the current/next idiosync shock in the transition matrix
@@ -82,7 +82,7 @@ function state_transition_OLG(z_next::Symbol, z::Symbol, Params::NamedTuple)
     π = z_chain.p[z_i, next_z_i]
     return π[:][begin]
 end
-export state_transition_OLG
+export state_transition
 
 function get_state_value_index(mc::MarkovChain, value)
     idx = findall(mc.state_values .== value)
@@ -90,7 +90,7 @@ function get_state_value_index(mc::MarkovChain, value)
 end 
 export get_state_value_index
 
-function c_transition_OLG(a_past::Float64, a::Vector{Float64}, z::Symbol, age::Int64, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
+function c_transition(a_past::Float64, a::Vector{Float64}, z::Symbol, age::Int64, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
     (; z_chain) = Params
     idx = get_state_value_index(z_chain, z)
     q = get_dispo_income(w, Params, Policy)
@@ -98,7 +98,7 @@ function c_transition_OLG(a_past::Float64, a::Vector{Float64}, z::Symbol, age::I
     c = (1 + r) * a_past + q[age, idx] + B - a[begin] 
     return c
 end
-export c_transition_OLG
+export c_transition
 
 function ubound(a_past::Float64, z::Symbol, age::Int64, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
     (; z_chain, a_min) = Params
@@ -114,9 +114,9 @@ function ubound(a_past::Float64, z::Symbol, age::Int64, r::Float64, w::Float64, 
 end
 export ubound
 
-function obj_OLG(V::AxisArray{Float64, 3}, a::Vector{Float64}, a_past::Float64, z::Symbol, age::Int64, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
+function obj(V::AxisArray{Float64, 3}, a::Vector{Float64}, a_past::Float64, z::Symbol, age::Int64, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
     (; ψ, β, z_chain, a_vals, β, u, J, j_star) = Params
-    c = c_transition_OLG(a_past, a, z, age, r, w, B, Params, Policy)
+    c = c_transition(a_past, a, z, age, r, w, B, Params, Policy)
 
     if age == J
         VF = u(c) 
@@ -130,7 +130,7 @@ function obj_OLG(V::AxisArray{Float64, 3}, a::Vector{Float64}, a_past::Float64, 
         # Initialise the expectation
         Ev_new = 0
         for z_next ∈ z_chain.state_values
-            π = state_transition_OLG(z_next, z, Params)
+            π = state_transition(z_next, z, Params)
             # # Extract the value function a skill given for the next shock
             v = V[Age = age + 1, Z = z_next]
             # Interpolate the value function on the asset for the following state
@@ -142,7 +142,7 @@ function obj_OLG(V::AxisArray{Float64, 3}, a::Vector{Float64}, a_past::Float64, 
     end
     return VF
 end
-export obj_OLG
+export obj
 
 function get_dr(r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
     (; β, z_chain, z_size, a_size, a_vals, a_min, β,  J) = Params
@@ -178,12 +178,12 @@ function get_dr(r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::
                 # Specify the initial value in the middle of the range
                 init = (lb + ub)/2
                 # Optimization
-                Sol = optimize(x -> -obj_OLG(V, x, a, z, j, r, w, B, Params, Policy), lb, ub, init)
+                Sol = optimize(x -> -obj(V, x, a, z, j, r, w, B, Params, Policy), lb, ub, init)
                 a_new = Optim.minimizer(Sol)
 
                 # Deduce optimal value function, consumption and asset
-                V[Age = j, Z = z, a = a_i] = obj_OLG(V, a_new, a, z, j, r, w, B, Params, Policy)
-                C[Age = j, Z = z, a = a_i] = c_transition_OLG(a, a_new, z, j, r, w, B, Params, Policy)
+                V[Age = j, Z = z, a = a_i] = obj(V, a_new, a, z, j, r, w, B, Params, Policy)
+                C[Age = j, Z = z, a = a_i] = c_transition(a, a_new, z, j, r, w, B, Params, Policy)
                 A[Age = j, Z = z, a = a_i] = a_new[begin]
 
             end
@@ -193,7 +193,7 @@ function get_dr(r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::
 end
 export get_dr
 
-function simulate_OLG(dr::AxisArray{Float64, 3}, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple; Initial_Z = 0.06, N=1)
+function simulate_model(dr::AxisArray{Float64, 3}, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple; Initial_Z = 0.06, N=1)
     (; J, ψ, z_chain, a_vals, a_min) = Params
 
     A = AxisArray(fill(NaN, (J, N));
@@ -245,7 +245,7 @@ function simulate_OLG(dr::AxisArray{Float64, 3}, r::Float64, w::Float64, B::Floa
                                                             extrapolation_bc = Line())(A[Age = j-1, N = n])
 
                 # Compute the current consumption
-                C[Age = j, N = n] = c_transition_OLG(A[Age = j-1, N = n], 
+                C[Age = j, N = n] = c_transition(A[Age = j-1, N = n], 
                                                     [A[Age = j, N = n]], 
                                                     Z[Age = j, N = n], 
                                                     j,
@@ -261,7 +261,7 @@ function simulate_OLG(dr::AxisArray{Float64, 3}, r::Float64, w::Float64, B::Floa
     return (A = A, Z = Z, C = C)
 
 end
-export simulate_OLG
+export simulate_model
 
 function get_ergodic_distribution(sim::NamedTuple, Params::NamedTuple; PopScaled::Bool = false)
     (; a_size, z_size, J, z_chain, a_vals, μ) = Params
@@ -421,7 +421,7 @@ function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Househ
 
         # Households 
         dr = get_dr(r, w, B0, HHs, Policies)
-        sim = simulate_OLG(dr.A, r, w, B0, HHs, Policies, N=N);
+        sim = simulate_model(dr.A, r, w, B0, HHs, Policies, N=N);
         λ = get_ergodic_distribution(sim, HHs, PopScaled = true)
 
         # Aggregation
