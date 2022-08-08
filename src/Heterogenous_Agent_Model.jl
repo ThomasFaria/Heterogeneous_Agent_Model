@@ -79,8 +79,8 @@ function state_transition(z_next::Symbol, z::Symbol, Params::NamedTuple)
     z_i = z_chain.state_values .== z
     next_z_i = z_chain.state_values .== z_next
 
-    π = z_chain.p[z_i, next_z_i]
-    return π[:][begin]
+    π_ = z_chain.p[z_i, next_z_i]
+    return π_[:][begin]
 end
 export state_transition
 
