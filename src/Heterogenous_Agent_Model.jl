@@ -14,12 +14,12 @@ end
 export import_aging_prob
 
 
-function pop_distrib(μ_1::Vector{Float64}, ψ::Vector{Float64}, find_root::Bool)
+function pop_distrib(μ_1::Vector{Float64}, ψ::Vector{Float64}, ρ::Float64, find_root::Bool)
     μ = zeros(size(ψ))
     μ[begin] = μ_1[1]
 
     for (index, value) in enumerate(ψ[2:end])
-        μ[index+1] = value* μ[index]
+        μ[index+1] = value/(1+ρ) * μ[index]
     end
 
     if find_root
@@ -29,10 +29,10 @@ function pop_distrib(μ_1::Vector{Float64}, ψ::Vector{Float64}, find_root::Bool
     end
 end
 
-function get_pop_distrib(ψ::Vector{Float64})
+function get_pop_distrib(ψ::Vector{Float64}, ρ::Float64)
     # Find first share that assures a sum equal to 1
-    sol = nlsolve(x -> pop_distrib(x, ψ, true), [0.02])
-    μ = pop_distrib(sol.zero, ψ, false)
+    sol = nlsolve(x -> pop_distrib(x, ψ, ρ, true), [0.02])
+    μ = pop_distrib(sol.zero, ψ, ρ, false)
     return μ
 end
 export get_pop_distrib

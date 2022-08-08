@@ -3,7 +3,6 @@ using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Seri
 # TODO : Checker la simulation des agents
 # TODO : Equilibrer les taxes pour l'équilibre générale
 # TODO : Simplifier les AxisArray pour les retraités
-# TODO : Rajouter le taux de croissance de la pop
 # TODO : Calculer le welfare pour policy
 
 Policy = @with_kw (
@@ -18,10 +17,11 @@ Households = @with_kw (
                     retirement_age = 65,
                     age_start_work = 21,
                     h = 0.45,
+                    ρ = 0.012,
                     j_star = retirement_age - age_start_work + 1,
                     J = death_age - age_start_work + 1,
                     ψ = import_aging_prob(age_start_work, death_age), # Probabilities to survive
-                    μ = get_pop_distrib(ψ), # Population distribution
+                    μ = get_pop_distrib(ψ, ρ), # Population distribution
                     ϵ = get_efficiency(age_start_work, retirement_age - 1), #Efficiency index
                     γ = 2., # Constant relative risk aversion (consumption utility)
                     Σ = 1., # Constant relative risk aversion (asset utility)
