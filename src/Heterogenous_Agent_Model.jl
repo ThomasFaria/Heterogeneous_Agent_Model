@@ -44,11 +44,9 @@ export get_efficiency
 
 function get_soc_sec_benefit(w::Float64, Households::NamedTuple, Policy::NamedTuple)
     (; θ) = Policy
-    (; ϵ, h, j_star, J) = Households
+    (; ϵ, h) = Households
 
-    W = w * h * ϵ
-    b  = zeros(J)
-    b[j_star:end] .= θ * mean(W)
+    b = θ * mean(w * h * ϵ)
 
     return b
 end
@@ -56,15 +54,16 @@ export get_soc_sec_benefit
 
 function get_dispo_income(w::Float64, Households::NamedTuple, Policy::NamedTuple)
     (; ξ, τ_ssc, τ_u) = Policy
-    (; ϵ, h, j_star) = Households
+    (; ϵ, h, j_star, J) = Households
 
     b = get_soc_sec_benefit(w, Households, Policy)
+    w_e = w * h * ϵ
 
-    q = zeros(size(b, 1), 2)
+    q = zeros(size(J, 1), 2)
 
-    q[begin:j_star-1,1] .= w * h * ϵ * ξ
-    q[begin:j_star-1,2] .= (1 - τ_ssc - τ_u) * w * h * ϵ
-    q[j_star:end,:] .= b[j_star:end]
+    q[begin:j_star-1,1] .= ξ * w_e
+    q[begin:j_star-1,2] .= (1 - τ_ssc - τ_u) * w_e
+    q[j_star:end,:] = b
     return q
 end
 export get_dispo_income
