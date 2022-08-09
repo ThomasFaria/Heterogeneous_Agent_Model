@@ -59,11 +59,11 @@ function get_dispo_income(w::Float64, Households::NamedTuple, Policy::NamedTuple
     b = get_soc_sec_benefit(w, Households, Policy)
     w_e = w * h * ϵ
 
-    q = zeros(size(J, 1), 2)
+    q = zeros(J, 2)
 
     q[begin:j_star-1,1] .= ξ * w_e
     q[begin:j_star-1,2] .= (1 - τ_ssc - τ_u) * w_e
-    q[j_star:end,:] = b
+    q[j_star:end,:] .= b
     return q
 end
 export get_dispo_income
