@@ -6,7 +6,7 @@ using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Seri
 Policy = @with_kw (
                     ξ = 0.4,
                     θ = 0.3,
-                    τ_ssc = 0.030166,
+                    τ_ssc = 0.067061,
                     τ_u = 0.06/0.94 * ξ
 )    
 
@@ -52,24 +52,6 @@ K = 3.
 B = 1.
 L = 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ)
 
-r = get_r(K, L, Firm)
-w = r_to_w(r, Firm)
-
-dr = get_dr(r, w, B, HHs, Policies)
-sim = simulate_model(dr, r, w, B, HHs, Policies, N=2000)
-λ = get_ergodic_distribution(sim, HHs, PopScaled = true)
-
-K1 = get_aggregate_K(λ, dr, HHs)
-B1 = get_aggregate_B(λ, dr, HHs)
-L1 = get_aggregate_L(λ, HHs)
-
-K = 0.4 * K + (1 - 0.4) * K1
-B = 0.4 * B + (1 - 0.4) * B1
-
-K = 3.
-B = 1.
-L = 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ)
-
 x = solve_equilibrium(
     K, 
     L,
@@ -80,15 +62,6 @@ x = solve_equilibrium(
     η_tol_K=1e-3,
     η_tol_B=1e-3
 )
-
-
-CC = get_aggregate_C(x.λ,  x.dr, HHs)
-II = get_aggregate_I(x.λ,  x.dr, Firm, HHs)
-YY = get_aggregate_Y(x.λ,  x.dr, Firm, HHs)
-
-YY - CC - II
-
-
 
 
 ## PLOTS
@@ -126,3 +99,7 @@ bar!(dropdims(sum(dropdims(sum(λ2, dims=3), dims=3), dims=2), dims=2))
 plot(dr.A[Age = 1])
 plot(dr.C[Age = 45])
 plot(dr.V[Age = 45])
+
+
+# For SSC
+(sum(HHs.μ[45:65]) * get_soc_sec_benefit(w, HHs, Policies)[end])/ (0.94 * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ)* w * HHs.h)
