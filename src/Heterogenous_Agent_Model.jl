@@ -545,6 +545,26 @@ function get_aggregate_Y(λ::NamedTuple,  dr::NamedTuple, Firm::NamedTuple, Para
 end
 export get_aggregate_Y
 
+function get_aggregate_Welfare(λ::NamedTuple,  dr::NamedTuple, Params::NamedTuple)
+    (; J, j_star, z_chain, a_size, β, ψ, u) = Params
+    W=0    
+    for j ∈ 1:J
+        for a ∈ 1:a_size
+            if j <= j_star-1
+                # Workers
+                for z ∈ z_chain.state_values
+                    W +=  β^(j-1) * prod(ψ[1:j]) * λ.λ_a[Age=j, Z=z, a=a] * u(dr.Act.C[Age=j, Z=z, a=a])
+                end
+            else j >= j_star
+                # Retired
+                W +=  β^(j-1) * prod(ψ[1:j]) * λ.λ_r[Age=j, a=a] * u(dr.Ret.C[Age=j, a=a])
+            end
+        end
+    end
+    return W
+end
+export get_aggregate_Welfare
+
 function check_GE(dr::NamedTuple, λ::NamedTuple, Households::NamedTuple, Firms::NamedTuple)
     # Consumption
     C = get_aggregate_C(λ,  dr, Households)

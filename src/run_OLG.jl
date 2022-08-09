@@ -3,7 +3,6 @@ using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Seri
 # TODO : Checker la simulation des agents
 # TODO : Equilibrer les taxes pour l'équilibre générale
 # TODO : Simplifier les AxisArray pour les retraités
-# TODO : Calculer le welfare pour policy
 
 Policy = @with_kw (
                     ξ = 0.4,
