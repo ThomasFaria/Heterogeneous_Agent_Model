@@ -44,57 +44,56 @@ Firms = @with_kw (
     δ = 0.08,
 )
 
-b = get_soc_sec_benefit(ϵ, h, w, j_star, J, Policies),
-W = get_wages(ϵ, h, w, Policies),
-q = get_dispo_income(W, b, j_star, Policies),
-
-
 
 # Initial values
 Firm = Firms();
-r = 0.02
-w = r_to_w(r, Firm)
-τ_ssc = 0.1
-τ_u = 0.1
 Policies = Policy()
 HHs = Households();
-L0 = 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ)
-
 
 K = 3.
 B = 1.
+L = 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ)
+
+r = get_r(K, L, Firm)
+w = r_to_w(r, Firm)
+
+dr = get_dr(r, w, B, HHs, Policies)
+sim = simulate_model(dr, r, w, B, HHs, Policies, N=2000)
+λ = get_ergodic_distribution(sim, HHs, PopScaled = true)
+
+K1 = get_aggregate_K(λ, dr, HHs)
+B1 = get_aggregate_B(λ, dr, HHs)
+L1 = get_aggregate_L(λ, HHs)
+
+K = 0.4 * K + (1 - 0.4) * K1
+B = 0.4 * B + (1 - 0.4) * B1
+
+K = 3.
+B = 1.
+L = 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ)
 
 x = solve_equilibrium(
     K, 
+    L,
     B,
+    Firm,
+    HHs,
+    Policies, 
     η_tol_K=1e-3,
     η_tol_B=1e-3
 )
 
 
-get_r(x.K, 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ), Firm)
-
-
-CC = get_aggregate_C(x.λ,  x.dr.C)
-II = get_aggregate_I(x.λ,  x.dr.A, Firm, HHs)
-YY = get_aggregate_Y(x.λ,  x.dr.A, Firm, HHs)
+CC = get_aggregate_C(x.λ,  x.dr, HHs)
+II = get_aggregate_I(x.λ,  x.dr, Firm, HHs)
+YY = get_aggregate_Y(x.λ,  x.dr, Firm, HHs)
 
 YY - CC - II
 
-dot(x.dr.C, x.λ)
-
-function check_GE(dr::NamedTuple, λ::AxisArray{Float64, 3},)
-    # Consumption
-    # Investment
-    # Output
-
-end
 
 
 
-x.K
-x.B
-
+## PLOTS
 plot(x.dr.V[Age = 65])
 
 bar(HHs.a_vals, sum(x.λ[Age = 60] / HHs.μ[60], dims=2))
@@ -107,44 +106,17 @@ bar!(HHs.a_vals,sum(x.λ[Age = 54], dims=2))
 bar!(HHs.a_vals, sum(x.λ[Age = 50], dims=2))
 bar!(HHs.a_vals, sum(x.λ[Age = 44], dims=2))
 
-
-r = get_r(x.K, 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ), Firm)
-w = r_to_w(r, Firm)
-
-HHs = Households()
-KK = x.K
-LL = get_aggregate_L(x.λ, HHs)
-CC = dot(x.dr.C, x.λ)
-YY = Firm.Ω * KK^Firm.α * LL^(1-Firm.α)
-A_past = similar(x.dr.A)
-A_past[Age = 2:65] = x.dr.A[Age = 1:64]
-A_past[Age = 1] = zeros(HHs.a_size, 2)
-KK_past = get_aggregate_K(x.λ, A_past)
-
-
-CC + KK - YY - (1 - Firm.δ) * KK_past
-
-
-
-
-dr = get_dr(pm)
-sim = simulate_OLG(dr.A, pm, N=10000);
-λ = get_ergodic_distribution(sim, pm)
-get_ergodic_distribution(sim, pm, PopScaled = true)
-
-
-
-bar(λ[Age = 60, Z = :E])
-bar!(λ[Age = 54, Z = :E])
-bar!(λ[Age = 50, Z = :E])
-bar!(λ[Age = 44, Z = :E])
-bar!(λ[Age = 1, Z = :E])
+bar(HHs.a_vals, λ[Age = 60], alpha=0.3)
+bar!(HHs.a_vals, λ[Age = 54], alpha=0.3)
+bar!(HHs.a_vals, λ[Age = 50], alpha=0.3)
+bar!(HHs.a_vals, λ[Age = 44], alpha=0.3)
+bar!(λ[Age = 1])
 
 
 pl = plot()
 xlabel!(L"Age")
 ylabel!(L"Assets")
-for n=1:3000
+for n=1:2000
     plot!(pl, sim.A[N = n] , label=nothing, color=:red, alpha=0.1)
 end
 pl
@@ -152,8 +124,6 @@ pl
 λ.mean(axis=(2,3))
 bar(dropdims(sum(dropdims(sum(λ, dims=3), dims=3), dims=2), dims=2))
 bar!(dropdims(sum(dropdims(sum(λ2, dims=3), dims=3), dims=2), dims=2))
-
-A[Age = 1]
 
 plot(dr.A[Age = 1])
 plot(dr.C[Age = 45])

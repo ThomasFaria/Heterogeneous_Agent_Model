@@ -598,15 +598,14 @@ function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Househ
         if (η_K<η_tol_K) & (η_B<η_tol_B)
             println("\n Algorithm stopped after iteration ", n, "\n")
             # check_GE(dr, λ, HHs, Firm) > 0.001  && @warn "Markets are not clearing"
-            # return (λ=λ, dr=dr, sim=sim, K=K1, B = B1, r=r, w=w, HH = HHs, τ_ssc=τ_ssc, τ_u=τ_u)
             return (λ=λ, dr=dr, sim=sim, K=K1, B = B1, r=r, w=w)
         end
-        # println("Convergence : ", check_GE(dr, λ, HHs, Firm))
+
         K0 = α_K * K0 + (1 - α_K) * K1
         B0 = α_B * B0 + (1 - α_B) * B1
         L0 = L1
 
-        set_postfix(iter, K=@sprintf("%.4f", K1), B=@sprintf("%.4f", B1),  η_K=@sprintf("%.4f", η_K), λ_K=@sprintf("%.4f", λ_K))
+        set_postfix(iter, K=@sprintf("%.4f", K1), B=@sprintf("%.4f", B1), CV=@sprintf("%.4f", check_GE(dr, λ, HHs, Firm)), r=@sprintf("%.4f", r), w=@sprintf("%.4f", w), η_K=@sprintf("%.4f", η_K), λ_K=@sprintf("%.4f", λ_K))
     end
 end
 export solve_equilibrium
