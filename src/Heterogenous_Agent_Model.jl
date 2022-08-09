@@ -556,7 +556,7 @@ function get_aggregate_Welfare(λ::NamedTuple,  dr::NamedTuple, Params::NamedTup
                 end
             else j >= j_star
                 # Retired
-                W +=  β^(j-1) * prod(ψ[1:j]) * λ.λ_r[Age=j, a=a] * u(dr.Ret.C[Age=j, a=a])
+                W +=  β^(j-1) * prod(ψ[1:j]) * λ.λ_r[Age=j - (j_star-1), a=a] * u(dr.Ret.C[Age=j - (j_star-1), a=a])
             end
         end
     end
