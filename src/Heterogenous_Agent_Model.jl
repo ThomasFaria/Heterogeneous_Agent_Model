@@ -599,7 +599,6 @@ function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Househ
         # Aggregation
         K1 = get_aggregate_K(λ, dr, HHs)
         B1 = get_aggregate_B(λ, dr, HHs)
-        L1 = get_aggregate_L(λ, HHs)
 
         # Policies
         # τ_ssc = get_SSC_rate(λ, w, HHs, Policies)
@@ -623,7 +622,6 @@ function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Househ
 
         K0 = α_K * K0 + (1 - α_K) * K1
         B0 = α_B * B0 + (1 - α_B) * B1
-        L0 = L1
 
         set_postfix(iter, K=@sprintf("%.4f", K1), B=@sprintf("%.4f", B1), CV=@sprintf("%.4f", check_GE(dr, λ, HHs, Firm)), r=@sprintf("%.4f", r), w=@sprintf("%.4f", w), η_K=@sprintf("%.4f", η_K), λ_K=@sprintf("%.4f", λ_K))
     end

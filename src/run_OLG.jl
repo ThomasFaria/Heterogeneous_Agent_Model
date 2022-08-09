@@ -1,5 +1,4 @@
 using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Serialization, StatsPlots, AxisArrays
-# TODO : Refaire la paramétrisation avec des fonctions
 # TODO : Checker la simulation des agents
 # TODO : Equilibrer les taxes pour l'équilibre générale
 # TODO : Simplifier les AxisArray pour les retraités
