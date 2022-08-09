@@ -6,8 +6,8 @@ using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Seri
 Policy = @with_kw (
                     ξ = 0.4,
                     θ = 0.3,
-                    τ_ssc = 0.1,
-                    τ_u = 0.1
+                    τ_ssc = 0.030166,
+                    τ_u = 0.06/0.94 * ξ
 )    
 
 Households = @with_kw ( 

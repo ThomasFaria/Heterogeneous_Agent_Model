@@ -62,8 +62,8 @@ function get_dispo_income(w::Float64, Households::NamedTuple, Policy::NamedTuple
 
     q = zeros(size(b, 1), 2)
 
-    q[begin:j_star-1,1] .= w * h * ξ
-    q[begin:j_star-1,2] = (1 - τ_ssc - τ_u) * w * h * ϵ
+    q[begin:j_star-1,1] .= w * h * ϵ * ξ
+    q[begin:j_star-1,2] .= (1 - τ_ssc - τ_u) * w * h * ϵ
     q[j_star:end,:] .= b[j_star:end]
     return q
 end
@@ -434,7 +434,7 @@ export get_SSC_rate
 function get_U_benefit_rate(λ::NamedTuple, w::Float64, Params::NamedTuple, Policy::NamedTuple)
     (; h, ϵ) = Params
     (; ξ) = Policy
-    U_benefit = sum(λ_r) * ξ * w * h
+    U_benefit = sum(λ.λ_a[Z=:U]* ϵ) * ξ * w * h
     tax_base = sum(λ.λ_a[Z=:E]* ϵ) * w * h
     return U_benefit/tax_base
 end
