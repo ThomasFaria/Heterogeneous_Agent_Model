@@ -440,106 +440,68 @@ end
 export get_U_benefit_rate
 
 function get_aggregate_K(λ::NamedTuple,  dr::NamedTuple, Params::NamedTuple)
-    (; a_size, J, j_star, z_chain) = Params
-    K=0    
-    for j ∈ 2:J
-        for a ∈ 1:a_size
-            if j <= j_star-1
-                # Workers
-                for z ∈ z_chain.state_values
-                    K += λ.λ_a[Age=j, Z=z, a=a] * dr.Act.A[Age=j-1, Z=z, a=a]
-                end
-            elseif j == j_star
-                K += λ.λ_r[Age= j- (j_star-1), a=a] * (0.06*dr.Act.A[Age=j-1, a=a, Z=:U] + (1-0.06)*dr.Act.A[Age=j-1, a=a, Z=:E])
-            elseif j > j_star
-                # Retired
-                K += λ.λ_r[Age= j- (j_star-1), a=a] * dr.Ret.A[Age= j- j_star, a=a]
-            end
-        end
+    (; J, j_star) = Params
+    K = 0
+    λ0= sum(λ.λ_a[Age=1])
+    for j=2:j_star-1
+        K += dot(λ.λ_a[Age=j], dr.Act.A[Age=j-1])
+        λ0 += sum(λ.λ_a[Age=j])
     end
+
+    for j=j_star+1:J
+        K += dot(λ.λ_r[Age=j - (j_star - 1)], dr.Ret.A[Age=j-j_star])
+        λ0 += sum(λ.λ_r[Age=j - (j_star - 1)])
+    end
+
+    w0 = λ.λ_a[Age=j_star-1] ./ reshape(repeat(sum(λ.λ_a[Age=j_star-1], dims=2),2), :,2)
+    replace!(w0, NaN=>0.)
+    K += dot(reshape(repeat(λ.λ_r[Age=1],2), :,2) .* w0, dr.Act.A[Age=j_star-1])
+    λ0 += sum(reshape(repeat(λ.λ_r[Age=1],2), :,2) .* w0)
+    @assert λ0 ≈ 1.
     return K
 end
 export get_aggregate_K
 
-function get_aggregate_L(λ::NamedTuple, Households::NamedTuple)
-    (; ϵ, h, j_star, a_size) = Households
-    L=0    
-    for j ∈ 1:j_star-1
-        for a ∈ 1:a_size
-                L += λ.λ_a[Age= j, a=a, Z=:E] * ϵ[j] * h
-        end
-    end
-    return L
-end
-export get_aggregate_L
+# function get_aggregate_L(λ::NamedTuple, Households::NamedTuple)
+#     (; ϵ, h, j_star, a_size) = Households
+#     L=0    
+#     for j ∈ 1:j_star-1
+#         for a ∈ 1:a_size
+#                 L += λ.λ_a[Age= j, a=a, Z=:E] * ϵ[j] * h
+#         end
+#     end
+#     return L
+# end
+# export get_aggregate_L
 
 function get_aggregate_B(λ::NamedTuple,  dr::NamedTuple, Params::NamedTuple)
-    (; ψ, J, a_size, j_star, z_chain) = Params
-    B=0    
-    for j ∈ 1:J
-        for a ∈ 1:a_size
-            if j <= j_star-1
-                # Workers
-                for z ∈ z_chain.state_values
-                    B += λ.λ_a[Age=j, Z=z, a=a] * (1-ψ[j+1]) * dr.Act.A[Age=j, Z=z, a=a]
-                end
-            else j >= j_star
-                # Retired
-                B += λ.λ_r[Age= j- (j_star-1), a=a] * (1-ψ[j+1]) * dr.Ret.A[Age= j- (j_star-1), a=a]
-            end
-        end
-    end
-    return B
+    (; j_star, ψ, z_size, a_size, J) = Params
+
+    ψ_reshaped_a_next = reshape(repeat(ψ[2:j_star], inner = (a_size * z_size)), (a_size, z_size, j_star-1))
+    ψ_reshaped_r_next = reshape(repeat(ψ[j_star+1:J+1], inner = (a_size)), (a_size, J - (j_star-1)))
+
+    return dot(λ.λ_a .* (1 .- ψ_reshaped_a_next), dr.Act.A) + dot(λ.λ_r .* (1 .- ψ_reshaped_r_next), dr.Ret.A)
 end
 export get_aggregate_B
 
-function get_aggregate_C(λ::NamedTuple,  dr::NamedTuple, Params::NamedTuple)
-    (; J, j_star, z_chain, a_size) = Params
-    C=0    
-    for j ∈ 1:J
-        for a ∈ 1:a_size
-            if j <= j_star-1
-                # Workers
-                for z ∈ z_chain.state_values
-                    C += λ.λ_a[Age=j, Z=z, a=a]  * dr.Act.C[Age=j, Z=z, a=a]
-                end
-            else j >= j_star
-                # Retired
-                C += λ.λ_r[Age= j- (j_star-1), a=a] * dr.Ret.C[Age= j- (j_star-1), a=a]
-            end
-        end
-    end
-    return C
+function get_aggregate_C(λ::NamedTuple,  dr::NamedTuple)
+    return dot(λ.λ_a, dr.Act.C) + dot(λ.λ_r, dr.Ret.C)
 end
 export get_aggregate_C
 
 function get_aggregate_I(λ::NamedTuple,  dr::NamedTuple, Firm::NamedTuple, Params::NamedTuple)
     (; δ) = Firm
-    (; J, j_star, z_chain, a_size) = Params
-    K=0    
-    for j ∈ 1:J
-        for a ∈ 1:a_size
-            if j <= j_star-1
-                # Workers
-                for z ∈ z_chain.state_values
-                    K += λ.λ_a[Age=j, Z=z, a=a]  * dr.Act.A[Age=j, Z=z, a=a]
-                end
-            else j >= j_star
-                # Retired
-                K += λ.λ_r[Age= j- (j_star-1), a=a] * dr.Ret.A[Age= j- (j_star-1), a=a]
-            end
-        end
-    end
-    
-    K_past = get_aggregate_K(λ, dr, Params)
-    return K - (1 - δ) * K_past
+
+    K_next = dot(λ.λ_a, dr.Act.A) + dot(λ.λ_r, dr.Ret.A)
+    K = get_aggregate_K(λ, dr, Params)
+    return K_next - (1 - δ) * K
 end
 export get_aggregate_I
 
-function get_aggregate_Y(λ::NamedTuple,  dr::NamedTuple, Firm::NamedTuple, Params::NamedTuple)
+function get_aggregate_Y(λ::NamedTuple,  dr::NamedTuple, L::Float64, Firm::NamedTuple, Params::NamedTuple)
     (; Ω, α) = Firm
     K = get_aggregate_K(λ, dr, Params)
-    L = get_aggregate_L(λ, Params)
+    # L = get_aggregate_L(λ, Params)
     return Ω * K^α * L^(1 - α)
 end
 export get_aggregate_Y
@@ -564,13 +526,13 @@ function get_aggregate_Welfare(λ::NamedTuple,  dr::NamedTuple, Params::NamedTup
 end
 export get_aggregate_Welfare
 
-function check_GE(dr::NamedTuple, λ::NamedTuple, Households::NamedTuple, Firms::NamedTuple)
+function check_GE(dr::NamedTuple, λ::NamedTuple, L::Float64, Households::NamedTuple, Firms::NamedTuple)
     # Consumption
-    C = get_aggregate_C(λ,  dr, Households)
+    C = get_aggregate_C(λ,  dr)
     # Investment
     I = get_aggregate_I(λ,  dr, Firms, Households)
     # Output
-    Y = get_aggregate_Y(λ,  dr, Firms, Households)
+    Y = get_aggregate_Y(λ,  dr, L, Firms, Households)
     return Y - (C + I)
 end
 export check_GE
@@ -597,6 +559,7 @@ function get_weight(val, range)
     end
     return (w0=w0, lb=idx_lb, ub=idx_ub)
 end
+export get_weight
 
 function get_distribution(dr::NamedTuple, Params::NamedTuple; PopScaled::Bool = false)
     (;a_size, z_size, j_star, z_chain, a_vals, J, μ) = Params
@@ -661,6 +624,7 @@ function get_distribution(dr::NamedTuple, Params::NamedTuple; PopScaled::Bool = 
     end
     return (λ_a=λ_a, λ_r=λ_r)
 end
+export get_distribution
 
 function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Households, Policy; N=10000, maxit=300, η_tol_K=1e-3, η_tol_B=1e-3, α_K=0.5, α_B=0.5)
     
@@ -710,7 +674,7 @@ function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Househ
         K0 = α_K * K0 + (1 - α_K) * K1
         B0 = α_B * B0 + (1 - α_B) * B1
 
-        set_postfix(iter, K=@sprintf("%.4f", K1), B=@sprintf("%.4f", B1), CV=@sprintf("%.4f", check_GE(dr, λ, HHs, Firm)), r=@sprintf("%.4f", r), w=@sprintf("%.4f", w), η_K=@sprintf("%.4f", η_K), λ_K=@sprintf("%.4f", λ_K))
+        set_postfix(iter, K=@sprintf("%.4f", K1), B=@sprintf("%.4f", B1), CV=@sprintf("%.4f", check_GE(dr, λ, L0, HHs, Firm)), r=@sprintf("%.4f", r), w=@sprintf("%.4f", w), η_K=@sprintf("%.4f", η_K), λ_K=@sprintf("%.4f", λ_K))
     end
 end
 export solve_equilibrium
