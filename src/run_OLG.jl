@@ -42,14 +42,13 @@ Firms = @with_kw (
     δ = 0.08,
 )
 
-
 # Initial values
 Firm = Firms();
 Policies = Policy()
 HHs = Households();
 
-K = 3.
-B = 1.
+K = 4.
+B = 0.5
 L = 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ)
 
 x = solve_equilibrium(

@@ -575,6 +575,93 @@ function check_GE(dr::NamedTuple, λ::NamedTuple, Households::NamedTuple, Firms:
 end
 export check_GE
 
+function get_weight(val, range)
+    idx = argmin(abs.(range .- val))
+    if val >= range[end]
+        w0 = 0
+        idx_lb = size(range,1)
+        idx_ub = size(range,1)
+    else
+        if range[idx] <= val
+            lb = range[idx]
+            ub = range[idx+1]
+        else range[idx] >= val
+            lb = range[idx-1]
+            ub = range[idx]
+            idx -= 1
+        end
+
+        w0 = (val - lb)/(ub - lb) 
+        idx_lb  = idx
+        idx_ub  = idx+1
+    end
+    return (w0=w0, lb=idx_lb, ub=idx_ub)
+end
+
+function get_distribution(dr::NamedTuple, Params::NamedTuple; PopScaled::Bool = false)
+    (;a_size, z_size, j_star, z_chain, a_vals, J, μ) = Params
+
+    λ_a = AxisArray(zeros(a_size, z_size, j_star-1);
+    a = 1:a_size,
+    Z = (z_chain.state_values),
+    Age = 1:j_star-1
+    )
+
+    λ_r = AxisArray(zeros(a_size, J-(j_star-1));
+    a = 1:a_size,
+    Age = j_star:J
+    )
+
+    # Initial wealth distribution
+    λ_a[Age=1, a=1] = [0.06 0.94] 
+
+    for j ∈ 2:j_star-1
+        for a_past ∈ 1:a_size
+            for z_past = z_chain.state_values
+                for z = z_chain.state_values
+                    res = get_weight(dr.Act.A[Age=j, Z=z, a=a_past], a_vals)
+                    λ_a[Age = j, Z=z, a = res.lb] += λ_a[Age=j-1, a=a_past, Z=z_past] * state_transition(z, z_past, Params) * (1 - res.w0)
+                    λ_a[Age = j, Z=z, a = res.ub] += λ_a[Age=j-1, a=a_past, Z=z_past] * state_transition(z, z_past, Params) * res.w0
+                end
+            end
+        end
+        @assert sum(λ_a[Age=j]) ≈ 1.
+    end
+
+    for j ∈ j_star
+        for a_past ∈ 1:a_size
+            for z_past = z_chain.state_values
+                res = get_weight(dr.Ret.A[Age= j - (j_star-1), a=a_past], a_vals)
+                λ_r[Age = j - (j_star-1), a = res.lb] += λ_a[Age=j-1, a=a_past, Z=z_past] * (1 - res.w0)
+                λ_r[Age = j - (j_star-1), a = res.ub] += λ_a[Age=j-1, a=a_past, Z=z_past] * res.w0
+            end
+        end
+        @assert sum(λ_r[Age=j - (j_star-1)]) ≈ 1.
+    end
+
+    for j ∈ j_star+1:J
+        for a_past ∈ 1:a_size
+            res = get_weight(dr.Ret.A[Age= j - (j_star-1), a=a_past], a_vals)
+            λ_r[Age = j - (j_star-1), a = res.lb] += λ_r[Age=j-j_star, a=a_past] * (1 - res.w0)
+            λ_r[Age = j - (j_star-1), a = res.ub] += λ_r[Age=j-j_star, a=a_past] * res.w0
+        end
+        @assert sum(λ_r[Age=j - (j_star-1)]) ≈ 1.
+    end
+
+    if PopScaled
+        for j ∈ 1:j_star-1
+            λ_a[Age = j] *= μ[j]
+        end
+        for j ∈ j_star:J
+            λ_r[Age = j - (j_star-1)] *= μ[j]
+        end
+        @assert (sum(λ_a) + sum(λ_r)) ≈ 1.
+    else
+        @assert (sum(λ_a) + sum(λ_r))/ J ≈ 1.
+    end
+    return (λ_a=λ_a, λ_r=λ_r)
+end
+
 function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Households, Policy; N=10000, maxit=300, η_tol_K=1e-3, η_tol_B=1e-3, α_K=0.5, α_B=0.5)
     
     # Initial values
@@ -592,8 +679,9 @@ function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Househ
 
         # Households 
         dr = get_dr(r, w, B0, HHs, Policies)
-        sim = simulate_model(dr, r, w, B0, HHs, Policies, N=N);
-        λ = get_ergodic_distribution(sim, HHs, PopScaled = true)
+        # sim = simulate_model(dr, r, w, B0, HHs, Policies, N=N);
+        # λ = get_ergodic_distribution(sim, HHs, PopScaled = true)
+        λ = get_distribution(dr, HHs, PopScaled = true)
 
         # Aggregation
         K1 = get_aggregate_K(λ, dr, HHs)
@@ -616,7 +704,7 @@ function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Househ
         if (η_K<η_tol_K) & (η_B<η_tol_B)
             println("\n Algorithm stopped after iteration ", n, "\n")
             # check_GE(dr, λ, HHs, Firm) > 0.001  && @warn "Markets are not clearing"
-            return (λ=λ, dr=dr, sim=sim, K=K1, B = B1, r=r, w=w)
+            return (λ=λ, dr=dr, K=K1, B = B1, r=r, w=w)
         end
 
         K0 = α_K * K0 + (1 - α_K) * K1
