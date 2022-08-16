@@ -424,7 +424,7 @@ function get_SSC_rate(λ::NamedTuple, w::Float64, Params::NamedTuple, Policy::Na
 
     b = get_soc_sec_benefit(w, Params, Policy)
 
-    SSC = sum(λ.λ_r) * b[j_star]
+    SSC = sum(λ.λ_r) * b
     tax_base = sum(λ.λ_a[Z=:E]* ϵ) * w * h
     return SSC/tax_base
 end
