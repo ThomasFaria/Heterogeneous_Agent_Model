@@ -1,13 +1,11 @@
 using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Serialization, StatsPlots, AxisArrays
-# TODO : Checker la simulation des agents
 # TODO : Equilibrer les taxes pour l'équilibre générale
-# TODO : Simplifier les AxisArray pour les retraités
 
 Policy = @with_kw (
                     ξ = 0.4,
                     θ = 0.3,
-                    τ_ssc = 0.067061,
-                    τ_u = 0.06/0.94 * ξ
+                    τ_ssc = θ * (sum(HHs.μ[HHs.j_star:end]) * mean(HHs.ϵ)) / (sum(HHs.μ[begin:HHs.j_star-1] .* HHs.ϵ)  * 0.94),
+                    τ_u = (0.06/0.94) * ξ
 )    
 
 Households = @with_kw ( 
@@ -44,8 +42,8 @@ Firms = @with_kw (
 
 # Initial values
 Firm = Firms();
-Policies = Policy()
 HHs = Households();
+Policies = Policy()
 
 K = 4.
 B = 0.5
@@ -62,8 +60,63 @@ x = solve_equilibrium(
     η_tol_B=1e-3
 )
 
-
 ## PLOTS
+
+λ_ = get_distribution(x.dr, HHs, PopScaled = false)
+
+
+# Consumption profiles
+plot(reshape(
+    hcat(dropdims(sum(sum(λ_.λ_a .* x.dr.Act.C, dims=2), dims=1), dims=1), sum(λ_.λ_r .* x.dr.Ret.C, dims=1)),
+     :,1)
+     )
+
+# Wealth profiles
+plot(reshape(
+    hcat(dropdims(sum(sum(λ_.λ_a .* x.dr.Act.A, dims=2), dims=1), dims=1), sum(λ_.λ_r .* x.dr.Ret.A, dims=1)),
+     :,1)
+     )
+
+# Overall distribution of wealth
+bar(HHs.a_vals,
+    sum(dropdims(sum(x.λ.λ_a, dims=2), dims=2), dims=2) .+ sum(x.λ.λ_r, dims=2),
+    )
+
+
+# Distribution of wealth for specific cohorts
+bar(HHs.a_vals,
+    sum(x.λ.λ_a[Age = 44], dims=2),
+    label= L"44 ans"
+    )
+
+bar!(HHs.a_vals,
+    x.λ.λ_r[Age = 6],
+    label= L"50 ans"
+    )
+
+bar!(HHs.a_vals,
+    x.λ.λ_r[Age = 10],
+    label= L"54 ans"
+    )
+
+bar!(HHs.a_vals,
+    x.λ.λ_r[Age = 16],
+    label= L"60 ans"
+    )
+
+bar(HHs.a_vals, sum(x.λ[Age = 60] / HHs.μ[60], dims=2))
+bar!(HHs.a_vals,sum(x.λ[Age = 54] / HHs.μ[54], dims=2))
+bar!(HHs.a_vals, sum(x.λ[Age = 50] / HHs.μ[50], dims=2))
+bar!(HHs.a_vals, sum(x.λ[Age = 44] / HHs.μ[44], dims=2))
+
+
+
+plot(x.dr.Act.C[Z=:E, a=1])
+
+plot(x.dr.Ret.C[a=10])
+x.dr.Ret.A
+x.dr.Ret.C
+
 plot(x.dr.V[Age = 65])
 
 bar(HHs.a_vals, sum(x.λ[Age = 60] / HHs.μ[60], dims=2))
