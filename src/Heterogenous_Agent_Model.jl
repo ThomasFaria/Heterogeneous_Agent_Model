@@ -648,13 +648,9 @@ function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Househ
         λ = get_distribution(dr, HHs, PopScaled = true)
 
         # Aggregation
-        K1 = get_aggregate_K(λ, dr, HHs)
+        K1 = dot(λ.λ_a, dr.Act.A) + dot(λ.λ_r, dr.Ret.A)
         B1 = get_aggregate_B(λ, dr, HHs)
 
-        # Policies
-        # τ_ssc = get_SSC_rate(λ, w, HHs, Policies)
-        # τ_u = get_U_benefit_rate(λ, w, HHs, Policies)
-        
 
         η_K = abs(K1 - K0) 
         η_B = abs(B1 - B0) 
