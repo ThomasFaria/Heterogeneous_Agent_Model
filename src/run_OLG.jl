@@ -43,13 +43,130 @@ Firms = @with_kw (
 # Initial values
 Firm = Firms();
 HHs = Households();
-Policies = Policy()
 
 K = 4.
 B = 0.5
 L = 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ)
 
-x = solve_equilibrium(
+Policies = Policy(θ = 0.1)
+x1 = solve_equilibrium(
+    K, 
+    L,
+    B,
+    Firm,
+    HHs,
+    Policies, 
+    η_tol_K=1e-3,
+    η_tol_B=1e-3
+)
+
+
+Policies = Policy(θ = 0.2)
+x2 = solve_equilibrium(
+    K, 
+    L,
+    B,
+    Firm,
+    HHs,
+    Policies, 
+    η_tol_K=1e-3,
+    η_tol_B=1e-3
+)
+
+Policies = Policy(θ = 0.3)
+x3 = solve_equilibrium(
+    K, 
+    L,
+    B,
+    Firm,
+    HHs,
+    Policies, 
+    η_tol_K=1e-3,
+    η_tol_B=1e-3
+)
+
+Policies = Policy(θ = 0.4)
+x4 = solve_equilibrium(
+    K, 
+    L,
+    B,
+    Firm,
+    HHs,
+    Policies, 
+    η_tol_K=1e-3,
+    η_tol_B=1e-3
+)
+
+
+Policies = Policy(θ = 0.5)
+x5 = solve_equilibrium(
+    K, 
+    L,
+    B,
+    Firm,
+    HHs,
+    Policies, 
+    η_tol_K=1e-3,
+    η_tol_B=1e-3
+)
+
+
+Policies = Policy(θ = 0.6)
+x6 = solve_equilibrium(
+    K, 
+    L,
+    B,
+    Firm,
+    HHs,
+    Policies, 
+    η_tol_K=1e-3,
+    η_tol_B=1e-3
+)
+
+
+
+Policies = Policy(θ = 0.7)
+x7 = solve_equilibrium(
+    K, 
+    L,
+    B,
+    Firm,
+    HHs,
+    Policies, 
+    η_tol_K=1e-3,
+    η_tol_B=1e-3
+)
+
+
+Policies = Policy(θ = 0.8)
+x8 = solve_equilibrium(
+    K, 
+    L,
+    B,
+    Firm,
+    HHs,
+    Policies, 
+    η_tol_K=1e-3,
+    η_tol_B=1e-3
+)
+
+
+Policies = Policy(θ = 0.9)
+x9 = solve_equilibrium(
+    K, 
+    L,
+    B,
+    Firm,
+    HHs,
+    Policies, 
+    η_tol_K=1e-3,
+    η_tol_B=1e-3
+)
+
+
+
+Policies = Policy(θ = 1.)
+x10 = solve_equilibrium(
     K, 
     L,
     B,
@@ -61,9 +178,7 @@ x = solve_equilibrium(
 )
 
 ## PLOTS
-
 λ_ = get_distribution(x.dr, HHs, PopScaled = false)
-
 
 # Consumption profiles
 plot(reshape(
