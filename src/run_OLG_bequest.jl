@@ -46,31 +46,24 @@ Policies = Policy()
 
 λ = deserialize("data/distrib_03.dat")
 
-idx = findfirst(b_next .== HHs.a_vals)
-age = 35
-age_parents = age + 20
-ϕ_next = :NI
-(ϕ_next == :NI) & (b_next == 0.)
-
 function bequest_distrib(b_next, ϕ_next, age, ϕ, λ, Params)
-    (; a_vals, j_star, ψ) = Params
+    (; a_vals, j_star, ψ, a_min) = Params
     age_parents = age + 20
     if ϕ == :I
         # Already inherited so for sure no more bequest and state doesn't change 
-        if (ϕ_next == :I) & (b_next == 0.)
-            return 1.
+        if (ϕ_next == :I) & (b_next == a_min)
+            prob = 1.
         else
-            return 0.
+            prob = 0.
         end
 
     else  #if agent did not inherited yet 
-
-        if (ϕ_next == :NI) & (b_next == 0.)
+        if (ϕ_next == :NI) & (b_next == a_min)
             # equal the probability that parents are still alive
-            return ψ[age_parents]
-        elseif (ϕ_next == :NI) & (b_next != 0.)
+            prob = ψ[age_parents]
+        elseif (ϕ_next == :NI) & (b_next != a_min)
             # Can't have a positive bequest if did not inherit
-            return 0.
+            prob = 0.
         elseif ϕ_next == :I
             idx = findfirst(b_next .== a_vals)
 
@@ -79,111 +72,71 @@ function bequest_distrib(b_next, ϕ_next, age, ϕ, λ, Params)
             else 
                 χ = λ.λ_r[Age = age_parents - (j_star - 1)][idx]
             end
-             
-            return  (1- ψ[age_parents]) * χ
+            prob = (1- ψ[age_parents]) * χ
         end
     end
-    
-
+    return prob
 end
-
-
-bequest_distrib(HHs.a_vals, :I, 41, :NI, λ, HHs)
-
-b_vals = gridmake(HHs.a_vals, [:I, :NI])
-
-
-
-υ = AxisArray(zeros(HHs.a_size, 2, 2, HHs.J);
-b = 1:HHs.a_size,
-ϕ_next = (:I, :NI),
-ϕ = (:I, :NI),
-Age = 1:HHs.J
-)
-
-
-(; β, z_chain, z_size, a_size, a_vals, a_min, β, j_star, J) = HHs
-
-# Active population
-V_a = AxisArray(zeros(a_size, z_size, 2, j_star-1);
-                a = 1:a_size,
-                Z = (z_chain.state_values),
-                ϕ = (:I, :NI),
-                Age = 1:j_star-1
-        )
-A_a = AxisArray(zeros(a_size, z_size, j_star-1);
-                    a = 1:a_size,
-                    Z = (z_chain.state_values),
-                    Age = 1:j_star-1
-            )
-C_a = AxisArray(zeros(a_size, z_size,  j_star-1);
-    a = 1:a_size,
-    Z = (z_chain.state_values),
-    Age = 1:j_star-1
-)
-
-# Retired
-V_r = AxisArray(zeros(a_size, J-(j_star-1));
-a = 1:a_size,
-Age = j_star:J
-)
-A_r = AxisArray(zeros(a_size, J-(j_star-1));
-    a = 1:a_size,
-    Age = j_star:J
-)
-C_r = AxisArray(zeros(a_size, J-(j_star-1));
-a = 1:a_size,
-Age = j_star:J
-)
-
-    # Loop over ages recursively
-    for j ∈ ProgressBar(J:-1:1)
-        # Loop over past assets
-        for (a_past_i, a_past) ∈ enumerate(a_vals)
-            if j >= j_star
-                age_i = j- (j_star-1)
-                ## Optimization for retired 
-                # Specify lower bound for optimisation
-                lb = [a_min]        
-                # Specify upper bound for optimisation
-                ub = ubound(a_past, :U, j, r, w, B, Params, Policy)
-                # Specify the initial value in the middle of the range
-                init = (lb + ub)/2
-                Sol = optimize(x -> -obj(V_r, x, a_past, :U, j, r, w, B, Params, Policy), lb, ub, init)
-                @assert Optim.converged(Sol)
-                a = Optim.minimizer(Sol)
-
-                # Deduce optimal value function, consumption and asset
-                V_r[Age = age_i, a = a_past_i] = -1 * Optim.minimum(Sol)
-                C_r[Age = age_i, a = a_past_i] = c_transition(a_past, a, :U, j, r, w, B, Params, Policy)
-                A_r[Age = age_i, a = a_past_i] = a[begin]
-            else    
-                ## Optimization for workers 
-                # Loop over idiosync shock
-                for z ∈ z_chain.state_values
-                    # Specify lower bound for optimisation
-                    lb = [a_min]        
-                    # Specify upper bound for optimisation
-                    ub = ubound(a_past, z, j, r, w, B, Params, Policy)
-                    # Specify the initial value in the middle of the range
-                    init = (lb + ub)/2
-                    # Optimization
-                    if j == j_star - 1
-                        Sol = optimize(x -> -obj(V_r, x, a_past, z, j, r, w, B, Params, Policy), lb, ub, init)
-
-                    else
-                        Sol = optimize(x -> -obj(V_a, x, a_past, z, j, r, w, B, Params, Policy), lb, ub, init)
-                    end
-                    @assert Optim.converged(Sol)
-                    a = Optim.minimizer(Sol)
-
-                    # Deduce optimal value function, consumption and asset
-                    V_a[Age = j, Z = z, a = a_past_i] = -1 * Optim.minimum(Sol)
-                    C_a[Age = j, Z = z, a = a_past_i] = c_transition(a_past, a, z, j, r, w, B, Params, Policy)
-                    A_a[Age = j, Z = z, a = a_past_i] = a[begin]
-                end
+function compute_bequest_distrib!(υ::AxisArray, b_vals::Matrix, b_vals_index::Matrix, Params::NamedTuple)
+    (; J) = Params
+    for ϕ = unique(b_vals[:,2])
+        for j = 1:J-20
+            for (b_next_i, ϕ_next) ∈ zip(b_vals_index[:,1], b_vals[:,2])
+                υ[b = b_next_i, ϕ_next = ϕ_next, ϕ = ϕ, Age = j] = bequest_distrib(b_vals[b_next_i,1], ϕ_next, j, ϕ, λ, Params) 
             end
         end
     end
-    return (Act = (V = V_a, C = C_a, A = A_a), Ret = (V = V_r, C = C_r, A = A_r))
+    return υ
 end
+
+function bequest_distrib_(λ::NamedTuple, Params::NamedTuple)
+    (; a_size, j_star, J, ψ) = Params
+    υ = AxisArray(zeros(a_size, 2, 2, J-20);
+        b = 1:a_size,
+        ϕ_next = [:I, :NI],
+        ϕ = [:I, :NI],
+        Age = 1:J-20
+    )
+
+    for j ∈ 1:J-20
+        age_parents = j + 20
+        # Already inherited so for sure no more bequest and state doesn't change 
+        υ[ϕ = :I, Age = j, ϕ_next = :I, b = 1] = 1.
+        # Not inherited yet 
+            ## Parents are still alive
+            υ[ϕ = :NI, Age = j, ϕ_next = :NI, b = 1] = ψ[age_parents]
+            ## Parents just dead
+                if age_parents < j_star
+                    ### Parents are not retired
+                    υ[ϕ = :NI, Age = j, ϕ_next = :I] = (1 - ψ[age_parents]) .* sum(λ.λ_a[Age = age_parents], dims = 2)
+                else
+                    ### Parents are retired
+                    υ[ϕ = :NI, Age = j, ϕ_next = :I] = (1 - ψ[age_parents]) .* λ.λ_r[Age = age_parents - (j_star - 1)]
+                end
+    end
+    return υ
+end
+
+
+υ = AxisArray(zeros(HHs.a_size, 2, 2, HHs.J-20);
+b = 1:HHs.a_size,
+ϕ_next = [:I, :NI],
+ϕ = [:I, :NI],
+Age = 1:HHs.J-20
+)
+
+b_vals = gridmake(HHs.a_vals, [:I, :NI])
+b_vals_index = gridmake(1:HHs.a_size, 1:2)
+
+
+
+υ = compute_bequest_distrib!(υ, b_vals, b_vals_index, HHs);
+
+sum(υ[ϕ = :I, Age = 35])
+sum(λ.λ_r)
+
+maximum(υ[ϕ = :I, ϕ_next= :NI])
+
+ww = bequest_distrib_(λ, HHs)
+
+ww .== υ
