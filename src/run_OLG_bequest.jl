@@ -1,13 +1,10 @@
 using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Serialization, StatsPlots, AxisArrays
-# TODO : Checker la simulation des agents
-# TODO : Equilibrer les taxes pour l'équilibre générale
-# TODO : Simplifier les AxisArray pour les retraités
 
 Policy = @with_kw (
                     ξ = 0.4,
                     θ = 0.3,
-                    τ_ssc = 0.067061,
-                    τ_u = 0.06/0.94 * ξ
+                    τ_ssc = θ * (sum(HHs.μ[HHs.j_star:end]) * mean(HHs.ϵ)) / (sum(HHs.μ[begin:HHs.j_star-1] .* HHs.ϵ)  * 0.94),
+                    τ_u = (0.06/0.94) * ξ
 )    
 
 Households = @with_kw ( 
@@ -44,14 +41,23 @@ Firms = @with_kw (
 
 # Initial values
 Firm = Firms();
-Policies = Policy()
 HHs = Households();
+Policies = Policy()
 
+λ = deserialize("data/distrib_03.dat")
 
-function bequest_distrib(b_next, ϕ_next, age, ϕ)
-    if ϕ == :Inherited
+idx = findfirst(b_next .== HHs.a_vals)
+age = 35
+age_parents = age + 20
+ϕ_next = :NI
+(ϕ_next == :NI) & (b_next == 0.)
+
+function bequest_distrib(b_next, ϕ_next, age, ϕ, λ, Params)
+    (; a_vals, j_star, ψ) = Params
+    age_parents = age + 20
+    if ϕ == :I
         # Already inherited so for sure no more bequest and state doesn't change 
-        if (ϕ_next == :Inherited) & (b_next = 0.)
+        if (ϕ_next == :I) & (b_next == 0.)
             return 1.
         else
             return 0.
@@ -59,22 +65,41 @@ function bequest_distrib(b_next, ϕ_next, age, ϕ)
 
     else  #if agent did not inherited yet 
 
-        if ϕ_next == :NotInherited & (b_next = 0.)
+        if (ϕ_next == :NI) & (b_next == 0.)
             # equal the probability that parents are still alive
-            return ψ[age + 15]
-        elseif ϕ_next == :NotInherited & (b_next != 0.)
+            return ψ[age_parents]
+        elseif (ϕ_next == :NI) & (b_next != 0.)
             # Can't have a positive bequest if did not inherit
             return 0.
-        elseif ϕ_next == Inherited
-            return measure of bequest which depends on age and  (on va utiliser le résultat du modèle précédent. Save les resultats et réutiliser balec)
+        elseif ϕ_next == :I
+            idx = findfirst(b_next .== a_vals)
 
-
-
-
+            if age_parents < j_star
+                χ = sum(λ.λ_a[Age = age_parents], dims = 2)[idx]
+            else 
+                χ = λ.λ_r[Age = age_parents - (j_star - 1)][idx]
+            end
+             
+            return  (1- ψ[age_parents]) * χ
+        end
     end
     
 
 end
+
+
+bequest_distrib(HHs.a_vals, :I, 41, :NI, λ, HHs)
+
+b_vals = gridmake(HHs.a_vals, [:I, :NI])
+
+
+
+υ = AxisArray(zeros(HHs.a_size, 2, 2, HHs.J);
+b = 1:HHs.a_size,
+ϕ_next = (:I, :NI),
+ϕ = (:I, :NI),
+Age = 1:HHs.J
+)
 
 
 (; β, z_chain, z_size, a_size, a_vals, a_min, β, j_star, J) = HHs
@@ -83,7 +108,7 @@ end
 V_a = AxisArray(zeros(a_size, z_size, 2, j_star-1);
                 a = 1:a_size,
                 Z = (z_chain.state_values),
-                ϕ = (:Inherited, :NotInherited),
+                ϕ = (:I, :NI),
                 Age = 1:j_star-1
         )
 A_a = AxisArray(zeros(a_size, z_size, j_star-1);
