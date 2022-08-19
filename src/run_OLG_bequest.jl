@@ -39,14 +39,9 @@ Firms = @with_kw (
     δ = 0.08,
 )
 
-# Initial values
-Firm = Firms();
-HHs = Households();
-Policies = Policy()
 
 using LinearAlgebra, Statistics, Interpolations, Optim, ProgressBars, Printf, QuantEcon, CSV, NLsolve, AxisArrays, Distributions, DataStructures, Parameters
 
-λ = deserialize("data/distrib_03.dat")
 function bequest_distrib(λ::NamedTuple, Params::NamedTuple)
     (; a_size, j_star) = Params
     υ = AxisArray(zeros(a_size, 2, 2, j_star-1);
@@ -358,10 +353,9 @@ function solve_equilibrium(K0::Float64, L0::Float64, υ0::AxisArray{Float64, 4},
 
         # Households 
         res = get_HH_distributions(υ0, r, w, HHs, Policies)
-        return res
+
         # Aggregation
         K1 = dot(res.λ_scaled.λ_a, res.dr.Act.A) + dot(res.λ_scaled.λ_r, res.dr.Ret.A)
-
 
         η = abs(K1 - K0) 
 
@@ -375,6 +369,7 @@ function solve_equilibrium(K0::Float64, L0::Float64, υ0::AxisArray{Float64, 4},
         end
 
         K0 = α * K0 + (1 - α) * K1
+        υ0 = res.υ1
 
         set_postfix(iter, η=@sprintf("%.4f", η), λ=@sprintf("%.4f", λ), K=@sprintf("%.4f", K1), r=@sprintf("%.4f", r), w=@sprintf("%.4f", w))
     end
@@ -389,3 +384,80 @@ L = 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ)
 
 Policies = Policy(θ = 0.3)
 x = solve_equilibrium(K, L, υ0, Firm, HHs, Policies)
+
+
+# Consumption profiles
+plot(reshape(
+    hcat(dropdims(dropdims(sum(sum(sum(x.res.λ.λ_a .* x.res.dr.Act.C, dims=1), dims=2), dims=3), dims=3), dims=2),
+    sum(x.res.λ.λ_r .* x.res.dr.Ret.C, dims=1)),
+         :,1)
+     )
+
+
+# Wealth profiles
+plot(reshape(
+    hcat(dropdims(dropdims(sum(sum(sum(x.res.λ.λ_a .* x.res.dr.Act.A, dims=1), dims=2), dims=3), dims=3), dims=2),
+    sum(x.res.λ.λ_r .* x.res.dr.Ret.A, dims=1)),
+         :,1)
+     )
+
+# Overall distribution of wealth
+bar(HHs.a_vals,
+    dropdims(dropdims(sum(sum(sum(x.res.λ_scaled.λ_a, dims=2), dims=3), dims=4) .+ sum(x.res.λ_scaled.λ_r, dims=2), dims=2), dims=3)
+    )
+
+
+# Distribution of wealth for specific cohorts
+bar(HHs.a_vals,
+    dropdims(sum(sum(x.res.λ.λ_a[Age = 44], dims=2), dims=3), dims=3),
+    label= L"44 ans"
+    )
+
+bar!(HHs.a_vals,
+    x.res.λ.λ_r[Age = 6],
+    label= L"50 ans"
+    )
+
+bar!(HHs.a_vals,
+    x.res.λ.λ_r[Age = 10],
+    label= L"54 ans"
+    )
+
+bar!(HHs.a_vals,
+    x.res.λ.λ_r[Age = 16],
+    label= L"60 ans"
+    )
+
+C = dot(x.res.λ_scaled.λ_a, x.res.dr.Act.C) + dot(x.res.λ_scaled.λ_r, x.res.dr.Ret.C)
+K = dot(x.res.λ_scaled.λ_a, x.res.dr.Act.A) + dot(x.res.λ_scaled.λ_r, x.res.dr.Ret.A)
+C + x.K * Firm.δ
+Y = (Firm.δ + x.r) * K + x.w * L
+
+Firm.Ω * x.K^Firm.α * L^(1 - Firm.α)
+
+
+kk = 5.2241
+yy = 1.22
+cc = 0.7396
+rr = 0.0041
+ww = 1.0064
+
+1.3193 * kk^Firm.α * 0.35^(1 - Firm.α)
+
+(Firm.δ + rr) * kk + ww/(mean(HHs.ϵ)*HHs.h) * 0.35
+
+kk = 4.0599
+yy = 1.1140
+cc = 0.7409
+rr = 0.0192
+ww = 0.9170
+
+1.3193 * kk^Firm.α * 0.35^(1 - Firm.α)
+
+
+
+
+
+(Firm.δ + rr) * kk + ww/(mean(HHs.ϵ)*HHs.h) * 0.35
+
+
