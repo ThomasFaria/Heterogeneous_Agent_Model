@@ -54,16 +54,19 @@ export get_soc_sec_benefit
 
 function get_dispo_income(w::Float64, Households::NamedTuple, Policy::NamedTuple)
     (; ξ, τ_ssc, τ_u) = Policy
-    (; ϵ, h, j_star, J) = Households
+    (; ϵ, h, j_star, J, z_size, z_chain) = Households
 
     b = get_soc_sec_benefit(w, Households, Policy)
     w_e = w * h * ϵ
 
-    q = zeros(J, 2)
+    q = AxisArray(zeros(J, z_size);
+        Age = 1:J,
+        Z = (z_chain.state_values)
+    )
 
-    q[begin:j_star-1,1] .= ξ * w_e
-    q[begin:j_star-1,2] .= (1 - τ_ssc - τ_u) * w_e
-    q[j_star:end,:] .= b
+    q[Age = begin:j_star-1, Z = :U] = ξ * w_e
+    q[Age = begin:j_star-1, Z = :E] = (1 - τ_ssc - τ_u) * w_e
+    q[Age = j_star:J] = b * ones(J-(j_star-1), z_size)
     return q
 end
 export get_dispo_income
@@ -91,19 +94,18 @@ function c_transition(a_past::Float64, a::Vector{Float64}, z::Symbol, age::Int64
     idx = get_state_value_index(z_chain, z)
     q = get_dispo_income(w, Params, Policy)
 
-    c = (1 + r) * a_past + q[age, idx] + B - a[begin] 
+    c = (1 + r) * a_past + q[Age = age, Z=z] + B - a[begin] 
     return c
 end
 export c_transition
 
 function ubound(a_past::Float64, z::Symbol, age::Int64, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
-    (; z_chain, a_min) = Params
-    idx = get_state_value_index(z_chain, z)
+    (; a_min) = Params
     q = get_dispo_income(w, Params, Policy)
 
     # Case when you save everything, no consumption only savings
     c =  a_min
-    ub = (1 + r) * a_past + q[age, idx] + B - c
+    ub = (1 + r) * a_past + q[Age = age, Z=z] + B - c
     ub = ifelse(ub <= a_min, a_min, ub)
 
     return [ub]
