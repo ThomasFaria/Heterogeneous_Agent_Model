@@ -90,8 +90,6 @@ end
 export get_state_value_index
 
 function c_transition(a_past::Float64, a::Vector{Float64}, z::Symbol, age::Int64, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
-    (; z_chain) = Params
-    idx = get_state_value_index(z_chain, z)
     q = get_dispo_income(w, Params, Policy)
 
     c = (1 + r) * a_past + q[Age = age, Z=z] + B - a[begin] 
@@ -114,7 +112,10 @@ export ubound
 
 function obj(V::AxisArray{Float64, 3}, a::Vector{Float64}, a_past::Float64, z::Symbol, age::Int64, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
     (; ψ, β, z_chain, a_vals, β, u) = Params
-    c = c_transition(a_past, a, z, age, r, w, B, Params, Policy)
+    # c = c_transition(a_past, a, z, age, r, w, B, Params, Policy)
+    q = get_dispo_income(w, Params, Policy)
+    c = (1+r) * a_past - a[begin] + q[Age = age, Z=z] + B
+
     # Initialise the expectation
     Ev_new = 0
     for z_next ∈ z_chain.state_values
@@ -132,8 +133,11 @@ end
 
 function obj(V::AxisArray{Float64, 2}, a::Vector{Float64}, a_past::Float64, z::Symbol, age::Int64, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
     (; ψ, β, a_vals, β, u, J, j_star) = Params
-    c = c_transition(a_past, a, z, age, r, w, B, Params, Policy)
+    # c = c_transition(a_past, a, z, age, r, w, B, Params, Policy)
+    # TODO Remove w and put q to accelerate
 
+    q = get_dispo_income(w, Params, Policy)
+    c = (1+r) * a_past - a[begin] + q[Age = age, Z=z] + B
     if age == J
         VF = u(c) 
     else
@@ -200,8 +204,8 @@ function get_dr(r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::
 
                 # Deduce optimal value function, consumption and asset
                 V_r[Age = age_i, a = a_past_i] = -1 * Optim.minimum(Sol)
-                C_r[Age = age_i, a = a_past_i] = c_transition(a_past, a, :U, j, r, w, B, Params, Policy)
                 A_r[Age = age_i, a = a_past_i] = a[begin]
+                # C_r[Age = age_i, a = a_past_i] = (1+r) * a_past - A_r[Age = age_i, a = a_past_i] + q[Age = j, Z=:U] + B
             else    
                 ## Optimization for workers 
                 # Loop over idiosync shock
@@ -224,12 +228,27 @@ function get_dr(r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::
 
                     # Deduce optimal value function, consumption and asset
                     V_a[Age = j, Z = z, a = a_past_i] = -1 * Optim.minimum(Sol)
-                    C_a[Age = j, Z = z, a = a_past_i] = c_transition(a_past, a, z, j, r, w, B, Params, Policy)
                     A_a[Age = j, Z = z, a = a_past_i] = a[begin]
+                    # C_a[Age = j, Z = z, a = a_past_i] = (1+r) * a_past - a[begin] + q[Age = j, Z=z] + B
+                    # @assert A_a[Age = j, Z = z, a = a_past_i] == (1+r) * a_past + q[Age = j, Z=z] + B - C_a[Age = j, Z = z, a = a_past_i]
+
                 end
             end
         end
     end
+
+    q = get_dispo_income(w, Params, Policy)
+    for j ∈ 1:j_star-1
+        for z ∈ z_chain.state_values
+            C_a[Age = j, Z=z] = (1+r) * a_vals .- A_a[Age = j, Z=z] .+ q[Age = j, Z=z] .+ B
+        end
+    end
+
+    for j ∈ j_star:J
+       C_r[Age = j - (j_star-1)] = (1+r) * a_vals .- A_r[Age = j - (j_star-1)] .+ q[Age = j, Z=:U] .+ B
+    end
+
+
     return (Act = (V = V_a, C = C_a, A = A_a), Ret = (V = V_r, C = C_r, A = A_r))
 end
 export get_dr
@@ -464,18 +483,6 @@ function get_aggregate_K(λ::NamedTuple,  dr::NamedTuple, Params::NamedTuple)
 end
 export get_aggregate_K
 
-# function get_aggregate_L(λ::NamedTuple, Households::NamedTuple)
-#     (; ϵ, h, j_star, a_size) = Households
-#     L=0    
-#     for j ∈ 1:j_star-1
-#         for a ∈ 1:a_size
-#                 L += λ.λ_a[Age= j, a=a, Z=:E] * ϵ[j] * h
-#         end
-#     end
-#     return L
-# end
-# export get_aggregate_L
-
 function get_aggregate_B(λ::NamedTuple,  dr::NamedTuple, Params::NamedTuple)
     (; j_star, ψ, z_size, a_size, J) = Params
 
@@ -672,7 +679,7 @@ function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Househ
         K0 = α_K * K0 + (1 - α_K) * K1
         B0 = α_B * B0 + (1 - α_B) * B1
 
-        set_postfix(iter, K=@sprintf("%.4f", K1), B=@sprintf("%.4f", B1), CV=@sprintf("%.4f", check_GE(dr, λ, L0, HHs, Firm)), r=@sprintf("%.4f", r), w=@sprintf("%.4f", w), η_K=@sprintf("%.4f", η_K), λ_K=@sprintf("%.4f", λ_K))
+        set_postfix(iter, K=@sprintf("%.4f", K1), B=@sprintf("%.4f", B1), r=@sprintf("%.4f", r), w=@sprintf("%.4f", w), η_K=@sprintf("%.4f", η_K), λ_K=@sprintf("%.4f", λ_K))
     end
 end
 export solve_equilibrium
