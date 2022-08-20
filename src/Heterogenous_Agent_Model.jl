@@ -452,29 +452,6 @@ function get_U_benefit_rate(λ::NamedTuple, w::Float64, Params::NamedTuple, Poli
 end
 export get_U_benefit_rate
 
-function get_aggregate_K(λ::NamedTuple,  dr::NamedTuple, Params::NamedTuple)
-    (; J, j_star) = Params
-    K = 0
-    λ0= sum(λ.λ_a[Age=1])
-    for j=2:j_star-1
-        K += dot(λ.λ_a[Age=j], dr.Act.A[Age=j-1])
-        λ0 += sum(λ.λ_a[Age=j])
-    end
-
-    for j=j_star+1:J
-        K += dot(λ.λ_r[Age=j - (j_star - 1)], dr.Ret.A[Age=j-j_star])
-        λ0 += sum(λ.λ_r[Age=j - (j_star - 1)])
-    end
-
-    w0 = λ.λ_a[Age=j_star-1] ./ reshape(repeat(sum(λ.λ_a[Age=j_star-1], dims=2),2), :,2)
-    replace!(w0, NaN=>0.)
-    K += dot(reshape(repeat(λ.λ_r[Age=1],2), :,2) .* w0, dr.Act.A[Age=j_star-1])
-    λ0 += sum(reshape(repeat(λ.λ_r[Age=1],2), :,2) .* w0)
-    @assert λ0 ≈ 1.
-    return K
-end
-export get_aggregate_K
-
 function get_aggregate_B(λ::NamedTuple,  dr::NamedTuple, Params::NamedTuple)
     (; j_star, ψ, z_size, a_size, J) = Params
 
@@ -484,6 +461,11 @@ function get_aggregate_B(λ::NamedTuple,  dr::NamedTuple, Params::NamedTuple)
     return dot(λ.λ_a .* (1 .- ψ_reshaped_a_next), dr.Act.A) + dot(λ.λ_r .* (1 .- ψ_reshaped_r_next), dr.Ret.A)
 end
 export get_aggregate_B
+
+function get_aggregate_K(λ::NamedTuple,  dr::NamedTuple)
+    return dot(λ.λ_a, dr.Act.A) + dot(λ.λ_r, dr.Ret.A)
+end
+export get_aggregate_K
 
 function get_aggregate_C(λ::NamedTuple,  dr::NamedTuple)
     return dot(λ.λ_a, dr.Act.C) + dot(λ.λ_r, dr.Ret.C)
