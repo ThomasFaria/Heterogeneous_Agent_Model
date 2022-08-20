@@ -86,30 +86,19 @@ function state_transition(z_next::Symbol, z::Symbol, ϕ_next::Symbol, ϕ::Symbol
     return π_[:][begin]
 end
 
-function ubound(a_past::Float64, z::Symbol, age::Int64, r::Float64, w::Float64, Params::NamedTuple, Policy::NamedTuple)
-    (; z_chain, a_min) = Params
-    idx = get_state_value_index(z_chain, z)
-    q = get_dispo_income(w, Params, Policy)
+function ubound(a_past::Float64, z::Symbol, age::Int64, r::Float64, q::AxisArray{Float64, 2}, Params::NamedTuple)
+    (; a_min) = Params
 
     # Case when you save everything, no consumption only savings
     c =  a_min
-    ub = (1 + r) * a_past + q[age, idx] - c
+    ub = (1 + r) * a_past + q[Age = age, Z=z] - c
     ub = ifelse(ub <= a_min, a_min, ub)
     return [ub]
 end
 
-function c_transition(a_past::Float64, a::Vector{Float64}, z::Symbol, age::Int64, r::Float64, w::Float64, Params::NamedTuple, Policy::NamedTuple)
-    (; z_chain) = Params
-    idx = get_state_value_index(z_chain, z)
-    q = get_dispo_income(w, Params, Policy)
-
-    c = (1 + r) * a_past + q[age, idx] - a[begin] 
-    return c
-end
-
-function obj(V::AxisArray{Float64, 2}, a::Vector{Float64}, a_past::Float64, z::Symbol, age::Int64, r::Float64, w::Float64, Params::NamedTuple, Policy::NamedTuple)
+function obj(V::AxisArray{Float64, 2}, a::Vector{Float64}, a_past::Float64, z::Symbol, age::Int64, r::Float64, q::AxisArray{Float64, 2}, Params::NamedTuple)
     (; ψ, β, a_vals, β, u, U, J, j_star) = Params
-    c = c_transition(a_past, a, z, age, r, w, Params, Policy)
+    c = (1+r) * a_past - a[begin] + q[Age = age, Z=z]
 
     if age == J
         VF = u(c) + β * U(a[begin])
@@ -123,9 +112,9 @@ function obj(V::AxisArray{Float64, 2}, a::Vector{Float64}, a_past::Float64, z::S
     return VF
 end
 
-function obj(V::AxisArray{Float64, 4}, a::Vector{Float64}, a_past::Float64, z::Symbol, ϕ::Symbol, age::Int64, r::Float64, w::Float64, υ::AxisArray, Params::NamedTuple, Policy::NamedTuple)
+function obj(V::AxisArray{Float64, 4}, a::Vector{Float64}, a_past::Float64, z::Symbol, ϕ::Symbol, age::Int64, r::Float64, q::AxisArray{Float64, 2}, υ::AxisArray, Params::NamedTuple)
     (; ψ, β, z_chain, a_vals, β, u, U) = Params
-    c = c_transition(a_past, a, z, age, r, w, Params, Policy)
+    c = (1+r) * a_past - a[begin] + q[Age = age, Z=z]
     # Initialise the expectation
     Ev_new = 0 
     for z_next ∈ z_chain.state_values
@@ -149,7 +138,7 @@ function obj(V::AxisArray{Float64, 4}, a::Vector{Float64}, a_past::Float64, z::S
     return VF
 end
 
-function get_dr(r::Float64, w::Float64, υ::AxisArray, Params::NamedTuple, Policy::NamedTuple)
+function get_dr(r::Float64, q::AxisArray{Float64, 2}, υ::AxisArray, Params::NamedTuple)
     (; β, z_chain, z_size, a_size, a_vals, a_min, β, j_star, J) = Params
     
     # Active population
@@ -196,16 +185,16 @@ function get_dr(r::Float64, w::Float64, υ::AxisArray, Params::NamedTuple, Polic
                 # Specify lower bound for optimisation
                 lb = [a_min]
                 # Specify upper bound for optimisation
-                ub = ubound(a_past, :U, j, r, w, Params, Policy)
+                ub = ubound(a_past, :U, j, r, q, Params)
                 # Specify the initial value in the middle of the range
                 init = (lb + ub)/2
-                Sol = optimize(x -> -obj(V_r, x, a_past, :U, j, r, w, Params, Policy), lb, ub, init)
+                Sol = optimize(x -> -obj(V_r, x, a_past, :U, j, r, q, Params), lb, ub, init)
                 @assert Optim.converged(Sol)
                 a = Optim.minimizer(Sol)
 
                 # Deduce optimal value function, consumption and asset
                 V_r[Age = age_i, a = a_past_i] = -1 * Optim.minimum(Sol)
-                C_r[Age = age_i, a = a_past_i] = c_transition(a_past, a, :U, j, r, w, Params, Policy)
+                C_r[Age = age_i, a = a_past_i] = (1+r) * a_past - a[begin] + q[Age = j, Z=:U]
                 A_r[Age = age_i, a = a_past_i] = a[begin]
             else    
                 ## Optimization for workers 
@@ -216,22 +205,22 @@ function get_dr(r::Float64, w::Float64, υ::AxisArray, Params::NamedTuple, Polic
                         # lb = ifelse((z == :U) & (a_past_i == 1), [a_min] .+ 1e-5,  [a_min])
                         lb = [a_min] #.+ 1e-5
                         # Specify upper bound for optimisation
-                        ub = ubound(a_past, z, j, r, w, Params, Policy)
+                        ub = ubound(a_past, z, j, r, q, Params)
                         # Specify the initial value in the middle of the range
                         init = (lb + ub)/2
                         # Optimization
                         if j == j_star - 1
-                            Sol = optimize(x -> -obj(V_r, x, a_past, z, j, r, w, Params, Policy), lb, ub, init)
+                            Sol = optimize(x -> -obj(V_r, x, a_past, z, j, r, q, Params), lb, ub, init)
 
                         else
-                            Sol = optimize(x -> -obj(V_a, x, a_past, z, ϕ, j, r, w, υ, Params, Policy), lb, ub, init)
+                            Sol = optimize(x -> -obj(V_a, x, a_past, z, ϕ, j, r, q, υ, Params), lb, ub, init)
                         end
                         @assert Optim.converged(Sol)
                         a = Optim.minimizer(Sol)
 
                         # Deduce optimal value function, consumption and asset
                         V_a[Age = j, Z = z, a = a_past_i, ϕ = ϕ] = -1 * Optim.minimum(Sol)
-                        C_a[Age = j, Z = z, a = a_past_i, ϕ = ϕ] = c_transition(a_past, a, z, j, r, w, Params, Policy)
+                        C_a[Age = j, Z = z, a = a_past_i, ϕ = ϕ] = (1+r) * a_past - a[begin] + q[Age = j, Z=z]
                         A_a[Age = j, Z = z, a = a_past_i, ϕ = ϕ] = a[begin]
                     end
                 end
@@ -312,12 +301,12 @@ function get_distribution(dr::NamedTuple, Params::NamedTuple; PopScaled::Bool = 
     return (λ_a=λ_a, λ_r=λ_r)
 end
 
-function get_HH_distributions(υ0::AxisArray{Float64, 4}, r::Float64, w::Float64, Params::NamedTuple, Policy::NamedTuple; maxit=300, η_tol = 1e-5)  
+function get_HH_distributions(υ0::AxisArray{Float64, 4}, r::Float64, q::AxisArray{Float64, 2}, Params::NamedTuple; maxit=300, η_tol = 1e-5)  
     η0 = 1.0
     iter = ProgressBar(1:maxit)
     for n in iter
 
-        dr = get_dr(r, w, υ0, Params, Policy)
+        dr = get_dr(r, q, υ0, Params)
         λ = get_distribution(dr, Params)
         υ1 = bequest_distrib(λ, Params)
 
@@ -352,7 +341,8 @@ function solve_equilibrium(K0::Float64, L0::Float64, υ0::AxisArray{Float64, 4},
         w = r_to_w(r, Firm)
 
         # Households 
-        res = get_HH_distributions(υ0, r, w, HHs, Policies)
+        q = get_dispo_income(w, HHs, Policies)
+        res = get_HH_distributions(υ0, r, q, HHs)
 
         # Aggregation
         K1 = dot(res.λ_scaled.λ_a, res.dr.Act.A) + dot(res.λ_scaled.λ_r, res.dr.Ret.A)
