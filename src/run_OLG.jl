@@ -33,7 +33,6 @@ Households = @with_kw (
                      u = γ == 1 ? c -> log(c) : c -> (c^(1 - γ)) / (1 - γ),
                     # U = Σ == 1 ? a -> log(a) : a -> (a^(1 - Σ)) / (1 - Σ),
 )
-
 Firms = @with_kw ( 
     α = 0.36,
     Ω = 1.3175, #1.3193,
@@ -56,8 +55,8 @@ x1 = solve_equilibrium(
     Firm,
     HHs,
     Policies, 
-    η_tol_K=1e-3,
-    η_tol_B=1e-3
+    η_tol_K=1e-2,
+    η_tol_B=1e-2
 )
 
 
@@ -178,8 +177,8 @@ x10 = solve_equilibrium(
 )
 
 ## PLOTS
-λ_ = get_distribution(x.dr, HHs, PopScaled = false)
-
+λ_ = get_distribution(x3.dr, HHs, PopScaled = false)
+serialize("data/distrib_03.dat", λ_)
 # Consumption profiles
 plot(reshape(
     hcat(dropdims(sum(sum(λ_.λ_a .* x.dr.Act.C, dims=2), dims=1), dims=1), sum(λ_.λ_r .* x.dr.Ret.C, dims=1)),
@@ -200,7 +199,7 @@ bar(HHs.a_vals,
 
 # Distribution of wealth for specific cohorts
 bar(HHs.a_vals,
-    sum(x.λ.λ_a[Age = 44], dims=2),
+    sum(x3.λ.λ_a[Age = 44], dims=2),
     label= L"44 ans"
     )
 
@@ -224,49 +223,3 @@ bar!(HHs.a_vals,sum(x.λ[Age = 54] / HHs.μ[54], dims=2))
 bar!(HHs.a_vals, sum(x.λ[Age = 50] / HHs.μ[50], dims=2))
 bar!(HHs.a_vals, sum(x.λ[Age = 44] / HHs.μ[44], dims=2))
 
-
-
-plot(x.dr.Act.C[Z=:E, a=1])
-
-plot(x.dr.Ret.C[a=10])
-x.dr.Ret.A
-x.dr.Ret.C
-
-plot(x.dr.V[Age = 65])
-
-bar(HHs.a_vals, sum(x.λ[Age = 60] / HHs.μ[60], dims=2))
-bar!(HHs.a_vals,sum(x.λ[Age = 54] / HHs.μ[54], dims=2))
-bar!(HHs.a_vals, sum(x.λ[Age = 50] / HHs.μ[50], dims=2))
-bar!(HHs.a_vals, sum(x.λ[Age = 44] / HHs.μ[44], dims=2))
-
-bar(HHs.a_vals, sum(x.λ[Age = 60], dims=2))
-bar!(HHs.a_vals,sum(x.λ[Age = 54], dims=2))
-bar!(HHs.a_vals, sum(x.λ[Age = 50], dims=2))
-bar!(HHs.a_vals, sum(x.λ[Age = 44], dims=2))
-
-bar(HHs.a_vals, λ[Age = 60], alpha=0.3)
-bar!(HHs.a_vals, λ[Age = 54], alpha=0.3)
-bar!(HHs.a_vals, λ[Age = 50], alpha=0.3)
-bar!(HHs.a_vals, λ[Age = 44], alpha=0.3)
-bar!(λ[Age = 1])
-
-
-pl = plot()
-xlabel!(L"Age")
-ylabel!(L"Assets")
-for n=1:2000
-    plot!(pl, sim.A[N = n] , label=nothing, color=:red, alpha=0.1)
-end
-pl
-
-λ.mean(axis=(2,3))
-bar(dropdims(sum(dropdims(sum(λ, dims=3), dims=3), dims=2), dims=2))
-bar!(dropdims(sum(dropdims(sum(λ2, dims=3), dims=3), dims=2), dims=2))
-
-plot(dr.A[Age = 1])
-plot(dr.C[Age = 45])
-plot(dr.V[Age = 45])
-
-
-# For SSC
-(sum(HHs.μ[45:65]) * get_soc_sec_benefit(w, HHs, Policies)[end])/ (0.94 * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ)* w * HHs.h)
