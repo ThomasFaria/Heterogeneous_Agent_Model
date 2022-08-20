@@ -1,5 +1,4 @@
 using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Serialization, StatsPlots, AxisArrays
-# TODO : Equilibrer les taxes pour l'équilibre générale
 
 Policy = @with_kw (
                     ξ = 0.4,
@@ -39,10 +38,27 @@ Firms = @with_kw (
     δ = 0.08,
 )
 
-# Initial values
 Firm = Firms();
 HHs = Households();
 
+Results = Dict()
+for θ ∈ range(0,1,11)
+    Results[θ] = solve_equilibrium(
+                                    4., 
+                                    0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ),
+                                    0.5,
+                                    Firm,
+                                    HHs,
+                                    Policy(θ = θ), 
+                                    η_tol_K=1e-3,
+                                    η_tol_B=1e-3
+                                )
+    
+end
+
+######################################################
+######################################################
+# Initial values
 K = 4.
 B = 0.5
 L = 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ)

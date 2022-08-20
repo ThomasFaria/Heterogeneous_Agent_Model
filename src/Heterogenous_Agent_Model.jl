@@ -622,7 +622,6 @@ function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Househ
         η_B = abs(B1 - B0) 
 
         λ_K = η_K/η0_K
-        λ_B = η_B/η0_B
 
         η0_K = η_K
         η0_B = η_B
@@ -630,7 +629,13 @@ function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Househ
         if (η_K<η_tol_K) & (η_B<η_tol_B)
             println("\n Algorithm stopped after iteration ", n, "\n")
             # check_GE(dr, λ, HHs, Firm) > 0.001  && @warn "Markets are not clearing"
-            return (λ=λ, dr=dr, K=K1, B = B1, r=r, w=w)
+            λ_scaled = λ
+            λ = get_distribution(dr, HHs, PopScaled = false)
+            C = get_aggregate_C(λ_scaled, dr)
+            Y = get_aggregate_Y(λ_scaled, dr, L0, Firm)
+            W = get_aggregate_Welfare(λ, dr, HHs)
+
+            return (λ=λ, λ_scaled=λ_scaled, dr=dr, K=K1, B = B1, C = C, Y = Y, W = W, r=r, w=w, Policy=Policies)
         end
 
         K0 = α_K * K0 + (1 - α_K) * K1
@@ -640,5 +645,11 @@ function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Househ
     end
 end
 export solve_equilibrium
+
+############################################################################################################
+################################# SECOND MODEL WITH BEQUEST MOTIVE #########################################
+############################################################################################################
+
+
 
 end
