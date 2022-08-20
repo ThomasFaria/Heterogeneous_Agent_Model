@@ -89,17 +89,15 @@ function get_state_value_index(mc::MarkovChain, value)
 end 
 export get_state_value_index
 
-function c_transition(a_past::Float64, a::Vector{Float64}, z::Symbol, age::Int64, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
-    q = get_dispo_income(w, Params, Policy)
+function c_transition(a_past::Float64, a::Vector{Float64}, z::Symbol, age::Int64, r::Float64, q::AxisArray{Float64, 2}, B::Float64)
 
     c = (1 + r) * a_past + q[Age = age, Z=z] + B - a[begin] 
     return c
 end
 export c_transition
 
-function ubound(a_past::Float64, z::Symbol, age::Int64, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
+function ubound(a_past::Float64, z::Symbol, age::Int64, r::Float64, q::AxisArray{Float64, 2}, B::Float64, Params::NamedTuple)
     (; a_min) = Params
-    q = get_dispo_income(w, Params, Policy)
 
     # Case when you save everything, no consumption only savings
     c =  a_min
@@ -110,10 +108,9 @@ function ubound(a_past::Float64, z::Symbol, age::Int64, r::Float64, w::Float64, 
 end
 export ubound
 
-function obj(V::AxisArray{Float64, 3}, a::Vector{Float64}, a_past::Float64, z::Symbol, age::Int64, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
+function obj(V::AxisArray{Float64, 3}, a::Vector{Float64}, a_past::Float64, z::Symbol, age::Int64, r::Float64, q::AxisArray{Float64, 2}, B::Float64, Params::NamedTuple)
     (; ψ, β, z_chain, a_vals, β, u) = Params
     # c = c_transition(a_past, a, z, age, r, w, B, Params, Policy)
-    q = get_dispo_income(w, Params, Policy)
     c = (1+r) * a_past - a[begin] + q[Age = age, Z=z] + B
 
     # Initialise the expectation
@@ -131,12 +128,10 @@ function obj(V::AxisArray{Float64, 3}, a::Vector{Float64}, a_past::Float64, z::S
     return VF
 end
 
-function obj(V::AxisArray{Float64, 2}, a::Vector{Float64}, a_past::Float64, z::Symbol, age::Int64, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
+function obj(V::AxisArray{Float64, 2}, a::Vector{Float64}, a_past::Float64, z::Symbol, age::Int64, r::Float64, q::AxisArray{Float64, 2}, B::Float64, Params::NamedTuple)
     (; ψ, β, a_vals, β, u, J, j_star) = Params
     # c = c_transition(a_past, a, z, age, r, w, B, Params, Policy)
-    # TODO Remove w and put q to accelerate
 
-    q = get_dispo_income(w, Params, Policy)
     c = (1+r) * a_past - a[begin] + q[Age = age, Z=z] + B
     if age == J
         VF = u(c) 
@@ -151,7 +146,7 @@ function obj(V::AxisArray{Float64, 2}, a::Vector{Float64}, a_past::Float64, z::S
 end
 export obj
 
-function get_dr(r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple)
+function get_dr(r::Float64, q::AxisArray{Float64, 2}, B::Float64, Params::NamedTuple)
     (; β, z_chain, z_size, a_size, a_vals, a_min, β, j_star, J) = Params
     
     # Active population
@@ -195,10 +190,10 @@ function get_dr(r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::
                 # Specify lower bound for optimisation
                 lb = [a_min]        
                 # Specify upper bound for optimisation
-                ub = ubound(a_past, :U, j, r, w, B, Params, Policy)
+                ub = ubound(a_past, :U, j, r, q, B, Params)
                 # Specify the initial value in the middle of the range
                 init = (lb + ub)/2
-                Sol = optimize(x -> -obj(V_r, x, a_past, :U, j, r, w, B, Params, Policy), lb, ub, init)
+                Sol = optimize(x -> -obj(V_r, x, a_past, :U, j, r, q, B, Params), lb, ub, init)
                 @assert Optim.converged(Sol)
                 a = Optim.minimizer(Sol)
 
@@ -213,15 +208,15 @@ function get_dr(r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::
                     # Specify lower bound for optimisation
                     lb = [a_min]        
                     # Specify upper bound for optimisation
-                    ub = ubound(a_past, z, j, r, w, B, Params, Policy)
+                    ub = ubound(a_past, z, j, r, q, B, Params)
                     # Specify the initial value in the middle of the range
                     init = (lb + ub)/2
                     # Optimization
                     if j == j_star - 1
-                        Sol = optimize(x -> -obj(V_r, x, a_past, z, j, r, w, B, Params, Policy), lb, ub, init)
+                        Sol = optimize(x -> -obj(V_r, x, a_past, z, j, r, q, B, Params), lb, ub, init)
 
                     else
-                        Sol = optimize(x -> -obj(V_a, x, a_past, z, j, r, w, B, Params, Policy), lb, ub, init)
+                        Sol = optimize(x -> -obj(V_a, x, a_past, z, j, r, q, B, Params), lb, ub, init)
                     end
                     @assert Optim.converged(Sol)
                     a = Optim.minimizer(Sol)
@@ -237,7 +232,6 @@ function get_dr(r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::
         end
     end
 
-    q = get_dispo_income(w, Params, Policy)
     for j ∈ 1:j_star-1
         for z ∈ z_chain.state_values
             C_a[Age = j, Z=z] = (1+r) * a_vals .- A_a[Age = j, Z=z] .+ q[Age = j, Z=z] .+ B
@@ -651,7 +645,8 @@ function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Househ
         w = r_to_w(r, Firm)
 
         # Households 
-        dr = get_dr(r, w, B0, HHs, Policies)
+        q = get_dispo_income(w, HHs, Policies)
+        dr = get_dr(r, q, B0, HHs)
         # sim = simulate_model(dr, r, w, B0, HHs, Policies, N=N);
         # λ = get_ergodic_distribution(sim, HHs, PopScaled = true)
         λ = get_distribution(dr, HHs, PopScaled = true)
