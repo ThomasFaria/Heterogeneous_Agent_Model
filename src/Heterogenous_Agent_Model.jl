@@ -508,22 +508,13 @@ end
 export get_aggregate_Y
 
 function get_aggregate_Welfare(λ::NamedTuple,  dr::NamedTuple, Params::NamedTuple)
-    (; J, j_star, z_chain, a_size, β, ψ, u) = Params
-    W=0    
-    for j ∈ 1:J
-        for a ∈ 1:a_size
-            if j <= j_star-1
-                # Workers
-                for z ∈ z_chain.state_values
-                    W +=  β^(j-1) * prod(ψ[1:j]) * λ.λ_a[Age=j, Z=z, a=a] * u(dr.Act.C[Age=j, Z=z, a=a])
-                end
-            else j >= j_star
-                # Retired
-                W +=  β^(j-1) * prod(ψ[1:j]) * λ.λ_r[Age=j - (j_star-1), a=a] * u(dr.Ret.C[Age=j - (j_star-1), a=a])
-            end
-        end
-    end
-    return W
+    (; J, j_star, β, ψ, u) = Params
+       
+    W_a = sum(reshape(sum(sum(u.(dr.Act.C) .* λ.λ_a, dims=1), dims=2), :,1) .* [β^(j-1) * prod(ψ[2:j+1]) for j ∈ 1:j_star-1])
+
+    W_r = sum(reshape(sum(u.(dr.Ret.C) .* λ.λ_r, dims=1), :,1) .* [β^(j-1) * prod(ψ[2:j+1]) for j ∈ j_star:J])
+    
+    return W_a + W_r
 end
 export get_aggregate_Welfare
 
