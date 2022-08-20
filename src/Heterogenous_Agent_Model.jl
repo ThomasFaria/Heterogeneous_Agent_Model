@@ -110,7 +110,6 @@ export ubound
 
 function obj(V::AxisArray{Float64, 3}, a::Vector{Float64}, a_past::Float64, z::Symbol, age::Int64, r::Float64, q::AxisArray{Float64, 2}, B::Float64, Params::NamedTuple)
     (; ψ, β, z_chain, a_vals, β, u) = Params
-    # c = c_transition(a_past, a, z, age, r, w, B, Params, Policy)
     c = (1+r) * a_past - a[begin] + q[Age = age, Z=z] + B
 
     # Initialise the expectation
@@ -130,7 +129,6 @@ end
 
 function obj(V::AxisArray{Float64, 2}, a::Vector{Float64}, a_past::Float64, z::Symbol, age::Int64, r::Float64, q::AxisArray{Float64, 2}, B::Float64, Params::NamedTuple)
     (; ψ, β, a_vals, β, u, J, j_star) = Params
-    # c = c_transition(a_past, a, z, age, r, w, B, Params, Policy)
 
     c = (1+r) * a_past - a[begin] + q[Age = age, Z=z] + B
     if age == J
