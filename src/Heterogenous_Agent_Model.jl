@@ -472,19 +472,9 @@ function get_aggregate_C(λ::NamedTuple,  dr::NamedTuple)
 end
 export get_aggregate_C
 
-function get_aggregate_I(λ::NamedTuple,  dr::NamedTuple, Firm::NamedTuple, Params::NamedTuple)
-    (; δ) = Firm
-
-    K_next = dot(λ.λ_a, dr.Act.A) + dot(λ.λ_r, dr.Ret.A)
-    K = get_aggregate_K(λ, dr, Params)
-    return K_next - (1 - δ) * K
-end
-export get_aggregate_I
-
-function get_aggregate_Y(λ::NamedTuple,  dr::NamedTuple, L::Float64, Firm::NamedTuple, Params::NamedTuple)
+function get_aggregate_Y(λ::NamedTuple,  dr::NamedTuple, L::Float64, Firm::NamedTuple)
     (; Ω, α) = Firm
-    K = get_aggregate_K(λ, dr, Params)
-    # L = get_aggregate_L(λ, Params)
+    K = get_aggregate_K(λ, dr)
     return Ω * K^α * L^(1 - α)
 end
 export get_aggregate_Y
@@ -500,14 +490,15 @@ function get_aggregate_Welfare(λ::NamedTuple,  dr::NamedTuple, Params::NamedTup
 end
 export get_aggregate_Welfare
 
-function check_GE(dr::NamedTuple, λ::NamedTuple, L::Float64, Households::NamedTuple, Firms::NamedTuple)
+function check_GE(dr::NamedTuple, λ::NamedTuple, L::Float64, Firms::NamedTuple)
+    (; δ) = Firms
     # Consumption
-    C = get_aggregate_C(λ,  dr)
-    # Investment
-    I = get_aggregate_I(λ,  dr, Firms, Households)
+    C = get_aggregate_C(λ, dr)
+    # Capital
+    K = get_aggregate_K(λ, dr)
     # Output
-    Y = get_aggregate_Y(λ,  dr, L, Firms, Households)
-    return Y - (C + I)
+    Y = get_aggregate_Y(λ,  dr, L, Firms)
+    return Y - (C + δ * K)
 end
 export check_GE
 
@@ -623,7 +614,7 @@ function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Househ
         λ = get_distribution(dr, HHs, PopScaled = true)
 
         # Aggregation
-        K1 = dot(λ.λ_a, dr.Act.A) + dot(λ.λ_r, dr.Ret.A)
+        K1 = get_aggregate_K(λ, dr)
         B1 = get_aggregate_B(λ, dr, HHs)
 
 
