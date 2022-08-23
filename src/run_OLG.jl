@@ -1,4 +1,4 @@
-using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Serialization, StatsPlots, AxisArrays
+using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Serialization, StatsPlots, AxisArrays, Printf
 
 Policy = @with_kw (
                     ξ = 0.4,
@@ -56,186 +56,111 @@ for θ ∈ range(0,1,11)
     
 end
 
+serialize("data/Results.dat", Results)
+
+
+
+
+
+
 ######################################################
 ######################################################
-# Initial values
-K = 4.
-B = 0.5
-L = 0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ)
-
-Policies = Policy(θ = 0.1)
-x1 = solve_equilibrium(
-    K, 
-    L,
-    B,
-    Firm,
-    HHs,
-    Policies, 
-    η_tol_K=1e-2,
-    η_tol_B=1e-2
-)
-
-
-Policies = Policy(θ = 0.2)
-x2 = solve_equilibrium(
-    K, 
-    L,
-    B,
-    Firm,
-    HHs,
-    Policies, 
-    η_tol_K=1e-3,
-    η_tol_B=1e-3
-)
-
-Policies = Policy(θ = 0.3)
-x3 = solve_equilibrium(
-    K, 
-    L,
-    B,
-    Firm,
-    HHs,
-    Policies, 
-    η_tol_K=1e-3,
-    η_tol_B=1e-3
-)
-
-Policies = Policy(θ = 0.4)
-x4 = solve_equilibrium(
-    K, 
-    L,
-    B,
-    Firm,
-    HHs,
-    Policies, 
-    η_tol_K=1e-3,
-    η_tol_B=1e-3
-)
-
-
-Policies = Policy(θ = 0.5)
-x5 = solve_equilibrium(
-    K, 
-    L,
-    B,
-    Firm,
-    HHs,
-    Policies, 
-    η_tol_K=1e-3,
-    η_tol_B=1e-3
-)
-
-
-Policies = Policy(θ = 0.6)
-x6 = solve_equilibrium(
-    K, 
-    L,
-    B,
-    Firm,
-    HHs,
-    Policies, 
-    η_tol_K=1e-3,
-    η_tol_B=1e-3
-)
-
-
-
-Policies = Policy(θ = 0.7)
-x7 = solve_equilibrium(
-    K, 
-    L,
-    B,
-    Firm,
-    HHs,
-    Policies, 
-    η_tol_K=1e-3,
-    η_tol_B=1e-3
-)
-
-
-Policies = Policy(θ = 0.8)
-x8 = solve_equilibrium(
-    K, 
-    L,
-    B,
-    Firm,
-    HHs,
-    Policies, 
-    η_tol_K=1e-3,
-    η_tol_B=1e-3
-)
-
-
-Policies = Policy(θ = 0.9)
-x9 = solve_equilibrium(
-    K, 
-    L,
-    B,
-    Firm,
-    HHs,
-    Policies, 
-    η_tol_K=1e-3,
-    η_tol_B=1e-3
-)
-
-
-
-Policies = Policy(θ = 1.)
-x10 = solve_equilibrium(
-    K, 
-    L,
-    B,
-    Firm,
-    HHs,
-    Policies, 
-    η_tol_K=1e-3,
-    η_tol_B=1e-3
-)
 
 ## PLOTS
-λ_ = get_distribution(x3.dr, HHs, PopScaled = false)
-serialize("data/distrib_03.dat", λ_)
-# Consumption profiles
-plot(reshape(
-    hcat(dropdims(sum(sum(λ_.λ_a .* x.dr.Act.C, dims=2), dims=1), dims=1), sum(λ_.λ_r .* x.dr.Ret.C, dims=1)),
-     :,1)
-     )
 
-# Wealth profiles
-plot(reshape(
-    hcat(dropdims(sum(sum(λ_.λ_a .* x.dr.Act.A, dims=2), dims=1), dims=1), sum(λ_.λ_r .* x.dr.Ret.A, dims=1)),
-     :,1)
-     )
+function plot_consumption_profiles(Results::Dict, θ::Float64, Params::NamedTuple)
+    (; J) = Params
+    C_a = reshape(sum(sum(Results[θ].λ.λ_a .* Results[θ].dr.Act.C, dims=2), dims=1), :, 1)
+    C_r = reshape(sum(Results[θ].λ.λ_r .* Results[θ].dr.Ret.C, dims=1), :, 1)
 
-# Overall distribution of wealth
-bar(HHs.a_vals,
-    sum(dropdims(sum(x.λ.λ_a, dims=2), dims=2), dims=2) .+ sum(x.λ.λ_r, dims=2),
-    )
+    p = plot((1:J) .+ 20
+        , vcat(C_a, C_r)
+        , label=nothing
+        )
+    xlabel!(L"Age")
+    ylabel!(L"Consumption")
+
+    return p
+end
+plot_consumption_profiles(Results, 0.1, HHs)
+
+function plot_wealth_profiles(Results::Dict, θ::Float64, Params::NamedTuple)
+    (; J) = Params
+    A_a = reshape(sum(sum(Results[θ].λ.λ_a .* Results[θ].dr.Act.A, dims=2), dims=1), :, 1)
+    A_r = reshape(sum(Results[θ].λ.λ_r .* Results[θ].dr.Ret.A, dims=1), :, 1)
+
+    p = plot((1:J) .+ 20
+        , vcat(A_a, A_r)
+        , label=nothing
+        )
+    xlabel!(L"Age")
+    ylabel!(L"Asset")
+
+    return p
+end
+
+function plot_wealth_profiles(Results::Dict, Policies::Vector{Float64}, Params::NamedTuple)
+    (; J) = Params
+    p = plot()
+
+    for θ ∈ Policies
+        A_a = reshape(sum(sum(Results[θ].λ.λ_a .* Results[θ].dr.Act.A, dims=2), dims=1), :, 1)
+        A_r = reshape(sum(Results[θ].λ.λ_r .* Results[θ].dr.Ret.A, dims=1), :, 1)
+
+        plot!(p
+            , (1:J) .+ 20
+            , vcat(A_a, A_r)
+            , label= @sprintf("θ = %.1f", θ)
+            )
+    end
+
+    xlabel!(L"Age")
+    ylabel!(L"Asset")
+
+    return p
+end
+
+plot_wealth_profiles(Results, 0.9, HHs)
+plot_wealth_profiles(Results, [0.0,0.6, 0.9], HHs)
+
+function plot_wealth_distrib(Results::Dict, θ::Float64, Params::NamedTuple)
+    (; a_vals) = Params
+    distrib = sum(sum(Results[θ].λ_scaled.λ_a, dims=2), dims=3) .+ sum(Results[θ].λ_scaled.λ_r, dims=2)
 
 
-# Distribution of wealth for specific cohorts
-bar(HHs.a_vals,
-    sum(x3.λ.λ_a[Age = 44], dims=2),
-    label= L"44 ans"
-    )
+    p = bar(a_vals
+        , reshape(distrib, :,1)
+        , label=nothing
+        )
+    xlabel!(L"Asset")
+    return p
+end
+plot_wealth_distrib(Results, 0.1, HHs)
 
-bar!(HHs.a_vals,
-    x.λ.λ_r[Age = 6],
-    label= L"50 ans"
-    )
+function plot_wealth_by_age(Results::Dict, θ::Float64, ages::Vector{Int64},  Params::NamedTuple)
+    (; a_vals, j_star) = Params
 
-bar!(HHs.a_vals,
-    x.λ.λ_r[Age = 10],
-    label= L"54 ans"
-    )
+    p = plot()
+    for j ∈ ages 
+        true_age = j+20
+        if j < j_star
+            bar!(p
+            , a_vals
+            , sum(Results[θ].λ.λ_a[Age = j], dims=2)
+            , label= @sprintf("%.0f ans", true_age)
+            )
+        else
+            bar!(p
+            , a_vals
+            , Results[θ].λ.λ_r[Age = j - (j_star-1)]
+            , label= @sprintf("%.0f ans", true_age)
+            )
 
-bar!(HHs.a_vals,
-    x.λ.λ_r[Age = 16],
-    label= L"60 ans"
-    )
+        end
+    end
 
-bar(HHs.a_vals, sum(x.λ[Age = 60] / HHs.μ[60], dims=2))
-bar!(HHs.a_vals,sum(x.λ[Age = 54] / HHs.μ[54], dims=2))
-bar!(HHs.a_vals, sum(x.λ[Age = 50] / HHs.μ[50], dims=2))
-bar!(HHs.a_vals, sum(x.λ[Age = 44] / HHs.μ[44], dims=2))
-
+    xlabel!(L"Asset")
+    return p
+end
+plot_wealth_by_age(Results, 0.3, [24, 30, 36, 40], HHs)
+plot_wealth_by_age(Results, 0.3, [44, 50, 56, 60], HHs)
