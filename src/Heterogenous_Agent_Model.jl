@@ -1,6 +1,6 @@
 module Heterogenous_Agent_Model
 
-using LinearAlgebra, Statistics, Interpolations, Optim, ProgressBars, Printf, QuantEcon, CSV, NLsolve, AxisArrays, Distributions, DataStructures, Parameters
+using LinearAlgebra, Statistics, Interpolations, Optim, ProgressBars, Printf, QuantEcon, CSV, NLsolve, AxisArrays, Distributions, DataStructures, Plots,         LaTeXStrings, Parameters
 
 
 function import_aging_prob(age_min::Int64, age_max::Int64)
@@ -526,7 +526,7 @@ function get_weight(val, range)
 end
 export get_weight
 
-function get_distribution(dr::NamedTuple, Params::NamedTuple; PopScaled::Bool = false)
+function get_distribution_(dr::NamedTuple, Params::NamedTuple; PopScaled::Bool = false)
     (;a_size, z_size, j_star, z_chain, a_vals, J, μ) = Params
 
     λ_a = AxisArray(zeros(a_size, z_size, j_star-1);
@@ -611,7 +611,7 @@ function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Househ
         dr = get_dr(r, q, B0, HHs)
         # sim = simulate_model(dr, r, w, B0, HHs, Policies, N=N);
         # λ = get_ergodic_distribution(sim, HHs, PopScaled = true)
-        λ = get_distribution(dr, HHs, PopScaled = true)
+        λ = get_distribution_(dr, HHs, PopScaled = true)
 
         # Aggregation
         K1 = get_aggregate_K(λ, dr)
@@ -630,7 +630,7 @@ function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Househ
             println("\n Algorithm stopped after iteration ", n, "\n")
             # check_GE(dr, λ, HHs, Firm) > 0.001  && @warn "Markets are not clearing"
             λ_scaled = λ
-            λ = get_distribution(dr, HHs, PopScaled = false)
+            λ = get_distribution_(dr, HHs, PopScaled = false)
             C = get_aggregate_C(λ_scaled, dr)
             Y = get_aggregate_Y(λ_scaled, dr, L0, Firm)
             W = get_aggregate_Welfare(λ, dr, HHs)
@@ -979,5 +979,104 @@ function solve_equilibrium(K0::Float64, L0::Float64, υ0::AxisArray{Float64, 4},
         set_postfix(iter, η=@sprintf("%.4f", η), λ=@sprintf("%.4f", λ), K=@sprintf("%.4f", K1), r=@sprintf("%.4f", r), w=@sprintf("%.4f", w))
     end
 end
+
+############################################################################################################
+############################################### PLOTTING ###################################################
+############################################################################################################
+
+
+function plot_consumption_profiles(Results::Dict, θ::Float64, Params::NamedTuple)
+    (; J) = Params
+    C_a = reshape(sum(sum(Results[θ].λ.λ_a .* Results[θ].dr.Act.C, dims=2), dims=1), :, 1)
+    C_r = reshape(sum(Results[θ].λ.λ_r .* Results[θ].dr.Ret.C, dims=1), :, 1)
+
+    p = plot((1:J) .+ 20
+        , vcat(C_a, C_r)
+        , label=nothing
+        )
+    xlabel!(L"Age")
+    ylabel!(L"Consumption")
+
+    return p
+end
+export plot_consumption_profiles
+
+function plot_wealth_profiles(Results::Dict, θ::Float64, Params::NamedTuple)
+    (; J) = Params
+    A_a = reshape(sum(sum(Results[θ].λ.λ_a .* Results[θ].dr.Act.A, dims=2), dims=1), :, 1)
+    A_r = reshape(sum(Results[θ].λ.λ_r .* Results[θ].dr.Ret.A, dims=1), :, 1)
+
+    p = plot((1:J) .+ 20
+        , vcat(A_a, A_r)
+        , label=nothing
+        )
+    xlabel!(L"Age")
+    ylabel!(L"Asset")
+
+    return p
+end
+
+function plot_wealth_profiles(Results::Dict, Policies::Vector{Float64}, Params::NamedTuple)
+    (; J) = Params
+    p = plot()
+
+    for θ ∈ Policies
+        A_a = reshape(sum(sum(Results[θ].λ.λ_a .* Results[θ].dr.Act.A, dims=2), dims=1), :, 1)
+        A_r = reshape(sum(Results[θ].λ.λ_r .* Results[θ].dr.Ret.A, dims=1), :, 1)
+
+        plot!(p
+            , (1:J) .+ 20
+            , vcat(A_a, A_r)
+            , label= @sprintf("θ = %.1f", θ)
+            )
+    end
+
+    xlabel!(L"Age")
+    ylabel!(L"Asset")
+
+    return p
+end
+export plot_wealth_profiles
+
+function plot_wealth_distrib(Results::Dict, θ::Float64, Params::NamedTuple)
+    (; a_vals) = Params
+    distrib = sum(sum(Results[θ].λ_scaled.λ_a, dims=2), dims=3) .+ sum(Results[θ].λ_scaled.λ_r, dims=2)
+
+
+    p = bar(a_vals
+        , reshape(distrib, :,1)
+        , label=nothing
+        )
+    xlabel!(L"Asset")
+    return p
+end
+export plot_wealth_distrib
+
+function plot_wealth_by_age(Results::Dict, θ::Float64, ages::Vector{Int64},  Params::NamedTuple)
+    (; a_vals, j_star) = Params
+
+    p = plot()
+    for j ∈ ages 
+        true_age = j+20
+        if j < j_star
+            bar!(p
+            , a_vals
+            , sum(Results[θ].λ.λ_a[Age = j], dims=2)
+            , label= @sprintf("%.0f ans", true_age)
+            )
+        else
+            bar!(p
+            , a_vals
+            , Results[θ].λ.λ_r[Age = j - (j_star-1)]
+            , label= @sprintf("%.0f ans", true_age)
+            )
+
+        end
+    end
+
+    xlabel!(L"Asset")
+    return p
+end
+export plot_wealth_by_age
 
 end
