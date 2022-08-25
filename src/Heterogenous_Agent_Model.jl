@@ -984,11 +984,10 @@ end
 ############################################### PLOTTING ###################################################
 ############################################################################################################
 
-
-function plot_consumption_profiles(Results::Dict, θ::Float64, Params::NamedTuple)
+function plot_consumption_profiles(λ_a::AxisArray{Float64,3}, C_a::AxisArray{Float64,3}, λ_r::AxisArray{Float64,2}, C_r::AxisArray{Float64,2}, Params::NamedTuple)
     (; J) = Params
-    C_a = reshape(sum(sum(Results[θ].λ.λ_a .* Results[θ].dr.Act.C, dims=2), dims=1), :, 1)
-    C_r = reshape(sum(Results[θ].λ.λ_r .* Results[θ].dr.Ret.C, dims=1), :, 1)
+    C_a = reshape(sum(sum(λ_a .* C_a, dims=2), dims=1), :, 1)
+    C_r = reshape(sum(λ_r .* C_r, dims=1), :, 1)
 
     p = plot((1:J) .+ 20
         , vcat(C_a, C_r)
@@ -1001,10 +1000,10 @@ function plot_consumption_profiles(Results::Dict, θ::Float64, Params::NamedTupl
 end
 export plot_consumption_profiles
 
-function plot_wealth_profiles(Results::Dict, θ::Float64, Params::NamedTuple)
+function plot_wealth_profiles(λ_a::AxisArray{Float64,3}, A_a::AxisArray{Float64,3}, λ_r::AxisArray{Float64,2}, A_r::AxisArray{Float64,2}, Params::NamedTuple)
     (; J) = Params
-    A_a = reshape(sum(sum(Results[θ].λ.λ_a .* Results[θ].dr.Act.A, dims=2), dims=1), :, 1)
-    A_r = reshape(sum(Results[θ].λ.λ_r .* Results[θ].dr.Ret.A, dims=1), :, 1)
+    A_a = reshape(sum(sum(λ_a .* A_a, dims=2), dims=1), :, 1)
+    A_r = reshape(sum(λ_r .* A_r, dims=1), :, 1)
 
     p = plot((1:J) .+ 20
         , vcat(A_a, A_r)
@@ -1016,7 +1015,7 @@ function plot_wealth_profiles(Results::Dict, θ::Float64, Params::NamedTuple)
     return p
 end
 
-function plot_wealth_profiles(Results::Dict, Policies::Vector{Float64}, Params::NamedTuple)
+function plot_wealth_profiles_multiple(Results::Dict, Policies::Vector{Float64}, Params::NamedTuple)
     (; J) = Params
     p = plot()
 
@@ -1036,12 +1035,11 @@ function plot_wealth_profiles(Results::Dict, Policies::Vector{Float64}, Params::
 
     return p
 end
-export plot_wealth_profiles
+export plot_wealth_profiles_multiple
 
-function plot_wealth_distrib(Results::Dict, θ::Float64, Params::NamedTuple)
+function plot_wealth_distrib(λ_scaled_a::AxisArray{Float64,3}, λ_scaled_r::AxisArray{Float64,2}, Params::NamedTuple)
     (; a_vals) = Params
-    distrib = sum(sum(Results[θ].λ_scaled.λ_a, dims=2), dims=3) .+ sum(Results[θ].λ_scaled.λ_r, dims=2)
-
+    distrib = sum(sum(λ_scaled_a, dims=2), dims=3) .+ sum(λ_scaled_r, dims=2)
 
     p = bar(a_vals
         , reshape(distrib, :,1)
@@ -1052,7 +1050,7 @@ function plot_wealth_distrib(Results::Dict, θ::Float64, Params::NamedTuple)
 end
 export plot_wealth_distrib
 
-function plot_wealth_by_age(Results::Dict, θ::Float64, ages::Vector{Int64},  Params::NamedTuple)
+function plot_wealth_by_age(λ_a::AxisArray{Float64,3}, λ_r::AxisArray{Float64,2}, ages::Vector{Int64},  Params::NamedTuple)
     (; a_vals, j_star) = Params
 
     p = plot()
@@ -1061,13 +1059,13 @@ function plot_wealth_by_age(Results::Dict, θ::Float64, ages::Vector{Int64},  Pa
         if j < j_star
             bar!(p
             , a_vals
-            , sum(Results[θ].λ.λ_a[Age = j], dims=2)
+            , sum(λ_a[Age = j], dims=2)
             , label= @sprintf("%.0f ans", true_age)
             )
         else
             bar!(p
             , a_vals
-            , Results[θ].λ.λ_r[Age = j - (j_star-1)]
+            , λ_r[Age = j - (j_star-1)]
             , label= @sprintf("%.0f ans", true_age)
             )
 

@@ -59,108 +59,31 @@ end
 serialize("data/Results.dat", Results)
 
 
-
-
-
-
 ######################################################
 ######################################################
+
+Results = deserialize("data/Results.dat")
 
 ## PLOTS
+θ = 0.3
+plot_consumption_profiles(Results[θ].λ.λ_a, Results[θ].dr.Act.C
+                        , Results[θ].λ.λ_r, Results[θ].dr.Ret.C
+                        , HHs)
 
-function plot_consumption_profiles(Results::Dict, θ::Float64, Params::NamedTuple)
-    (; J) = Params
-    C_a = reshape(sum(sum(Results[θ].λ.λ_a .* Results[θ].dr.Act.C, dims=2), dims=1), :, 1)
-    C_r = reshape(sum(Results[θ].λ.λ_r .* Results[θ].dr.Ret.C, dims=1), :, 1)
+plot_wealth_profiles(Results[θ].λ.λ_a, Results[θ].dr.Act.A
+                   , Results[θ].λ.λ_r, Results[θ].dr.Ret.A
+                   , HHs)
 
-    p = plot((1:J) .+ 20
-        , vcat(C_a, C_r)
-        , label=nothing
-        )
-    xlabel!(L"Age")
-    ylabel!(L"Consumption")
+plot_wealth_profiles_multiple(Results, [0.0,0.6, 0.9], HHs)
 
-    return p
-end
-plot_consumption_profiles(Results, 0.1, HHs)
-
-function plot_wealth_profiles(Results::Dict, θ::Float64, Params::NamedTuple)
-    (; J) = Params
-    A_a = reshape(sum(sum(Results[θ].λ.λ_a .* Results[θ].dr.Act.A, dims=2), dims=1), :, 1)
-    A_r = reshape(sum(Results[θ].λ.λ_r .* Results[θ].dr.Ret.A, dims=1), :, 1)
-
-    p = plot((1:J) .+ 20
-        , vcat(A_a, A_r)
-        , label=nothing
-        )
-    xlabel!(L"Age")
-    ylabel!(L"Asset")
-
-    return p
-end
-
-function plot_wealth_profiles(Results::Dict, Policies::Vector{Float64}, Params::NamedTuple)
-    (; J) = Params
-    p = plot()
-
-    for θ ∈ Policies
-        A_a = reshape(sum(sum(Results[θ].λ.λ_a .* Results[θ].dr.Act.A, dims=2), dims=1), :, 1)
-        A_r = reshape(sum(Results[θ].λ.λ_r .* Results[θ].dr.Ret.A, dims=1), :, 1)
-
-        plot!(p
-            , (1:J) .+ 20
-            , vcat(A_a, A_r)
-            , label= @sprintf("θ = %.1f", θ)
-            )
-    end
-
-    xlabel!(L"Age")
-    ylabel!(L"Asset")
-
-    return p
-end
-
-plot_wealth_profiles(Results, 0.9, HHs)
-plot_wealth_profiles(Results, [0.0,0.6, 0.9], HHs)
-
-function plot_wealth_distrib(Results::Dict, θ::Float64, Params::NamedTuple)
-    (; a_vals) = Params
-    distrib = sum(sum(Results[θ].λ_scaled.λ_a, dims=2), dims=3) .+ sum(Results[θ].λ_scaled.λ_r, dims=2)
+plot_wealth_distrib(Results[θ].λ_scaled.λ_a
+                  , Results[θ].λ_scaled.λ_r, HHs)
 
 
-    p = bar(a_vals
-        , reshape(distrib, :,1)
-        , label=nothing
-        )
-    xlabel!(L"Asset")
-    return p
-end
-plot_wealth_distrib(Results, 0.1, HHs)
+plot_wealth_by_age(Results[θ].λ_scaled.λ_a
+                 , Results[θ].λ_scaled.λ_r
+                 , [24, 30, 36, 40], HHs)
 
-function plot_wealth_by_age(Results::Dict, θ::Float64, ages::Vector{Int64},  Params::NamedTuple)
-    (; a_vals, j_star) = Params
-
-    p = plot()
-    for j ∈ ages 
-        true_age = j+20
-        if j < j_star
-            bar!(p
-            , a_vals
-            , sum(Results[θ].λ.λ_a[Age = j], dims=2)
-            , label= @sprintf("%.0f ans", true_age)
-            )
-        else
-            bar!(p
-            , a_vals
-            , Results[θ].λ.λ_r[Age = j - (j_star-1)]
-            , label= @sprintf("%.0f ans", true_age)
-            )
-
-        end
-    end
-
-    xlabel!(L"Asset")
-    return p
-end
-plot_wealth_by_age(Results, 0.3, [24, 30, 36, 40], HHs)
-plot_wealth_by_age(Results, 0.3, [44, 50, 56, 60], HHs)
+plot_wealth_by_age(Results[θ].λ_scaled.λ_a
+                 , Results[θ].λ_scaled.λ_r
+                 , [44, 50, 56, 60], HHs)
