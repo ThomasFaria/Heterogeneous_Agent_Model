@@ -3,8 +3,8 @@ using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Seri
 Policy = @with_kw (
                     ξ = 0.4,
                     θ = 0.3,
-                    τ_ssc = θ * (sum(HHs.μ[HHs.j_star:end]) * mean(HHs.ϵ)) / (sum(HHs.μ[begin:HHs.j_star-1] .* HHs.ϵ)  * 0.94),
-                    τ_u = (0.06/0.94) * ξ
+                    τ_ssc = θ * (sum(HHs.μ[HHs.j_star:end]) * mean(HHs.ϵ)) / (sum(HHs.μ[begin:HHs.j_star-1] .* HHs.ϵ)  * (1-0.074)),
+                    τ_u = (0.074/(1-0.074)) * ξ
 )    
 
 Households = @with_kw ( 
@@ -21,8 +21,8 @@ Households = @with_kw (
                     γ = 2., # Constant relative risk aversion (consumption utility)
                     Σ = 1., # Constant relative risk aversion (asset utility)
                     β = 1.011,
-                    z_chain = MarkovChain([0.06 0.94;
-                                           0.06 0.94], 
+                    z_chain = MarkovChain([0.074 1-0.074;
+                                           0.074 1-0.074], 
                                         [:U; :E]),
                     a_min = 1e-10,
                     a_max = 15.,
@@ -45,7 +45,7 @@ Results = Dict()
 for θ ∈ range(0,1,11)
     Results[θ] = solve_equilibrium(
                                     4., 
-                                    0.94 * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ),
+                                    (1-0.074) * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ),
                                     0.5,
                                     Firm,
                                     HHs,

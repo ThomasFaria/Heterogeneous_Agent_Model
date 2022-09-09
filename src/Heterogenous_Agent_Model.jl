@@ -245,7 +245,7 @@ function get_dr(r::Float64, q::AxisArray{Float64, 2}, B::Float64, Params::NamedT
 end
 export get_dr
 
-function simulate_model(dr::NamedTuple, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple; Initial_Z = 0.06, N=1)
+function simulate_model(dr::NamedTuple, r::Float64, w::Float64, B::Float64, Params::NamedTuple, Policy::NamedTuple; Initial_Z = 0.074, N=1)
     (; J, ψ, z_chain, a_vals, a_min, j_star) = Params
 
     A = AxisArray(fill(NaN, (J, N));
@@ -541,7 +541,7 @@ function get_distribution_(dr::NamedTuple, Params::NamedTuple; PopScaled::Bool =
     )
 
     # Initial wealth distribution
-    λ_a[Age=1, a=1] = [0.06 0.94] 
+    λ_a[Age=1, a=1] = [0.074 1-0.074] 
 
     for j ∈ 2:j_star-1
         for a_past ∈ 1:a_size
@@ -856,7 +856,7 @@ function get_distribution(dr::NamedTuple, Params::NamedTuple; PopScaled::Bool = 
     )
 
     # Initial wealth distribution
-    λ_a[Age=1, a=1, ϕ = :NI] = [0.06 0.94] 
+    λ_a[Age=1, a=1, ϕ = :NI] = [0.074 1-0.074] 
 
     for j ∈ 2:j_star-1
         for a_past ∈ 1:a_size
