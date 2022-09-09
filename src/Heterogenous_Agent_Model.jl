@@ -641,7 +641,8 @@ function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Househ
         K0 = α_K * K0 + (1 - α_K) * K1
         B0 = α_B * B0 + (1 - α_B) * B1
 
-        set_postfix(iter, K=@sprintf("%.4f", K1), B=@sprintf("%.4f", B1), r=@sprintf("%.4f", r), w=@sprintf("%.4f", w), η_K=@sprintf("%.4f", η_K), λ_K=@sprintf("%.4f", λ_K))
+        Y = get_aggregate_Y(λ, dr, L0, Firm)
+        set_postfix(iter, K=@sprintf("%.4f", K1), B=@sprintf("%.4f", B1), Y=@sprintf("%.4f", Y), r=@sprintf("%.4f", r), w=@sprintf("%.4f", w), η_K=@sprintf("%.4f", η_K), λ_K=@sprintf("%.4f", λ_K))
     end
 end
 export solve_equilibrium
