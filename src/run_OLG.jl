@@ -8,8 +8,8 @@ Policy = @with_kw (
 )    
 
 Households = @with_kw ( 
-                    death_age = 85,
-                    retirement_age = 65,
+                    death_age = 90,
+                    retirement_age = 63,
                     age_start_work = 21,
                     h = 0.45,
                     ρ = 0.012,
