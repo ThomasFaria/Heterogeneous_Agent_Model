@@ -1,8 +1,8 @@
 using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Serialization, StatsPlots, AxisArrays, Printf
 
 Policy = @with_kw (
-                    ξ = 0.4,
-                    θ = 0.3,
+                    ξ = 0.65,
+                    θ = 0.74,
                     τ_ssc = θ * (sum(HHs.μ[HHs.j_star:end]) * mean(HHs.ϵ)) / (sum(HHs.μ[begin:HHs.j_star-1] .* HHs.ϵ)  * (1-0.074)),
                     τ_u = (0.074/(1-0.074)) * ξ
 )    
