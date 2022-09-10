@@ -56,6 +56,17 @@ for θ ∈ range(0,1,11)
     
 end
 
+Results[θ] = solve_equilibrium(
+    4., 
+    (1-0.074) * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ),
+    0.5,
+    Firm,
+    HHs,
+    Policy(θ = 0.74), 
+    η_tol_K=1e-3,
+    η_tol_B=1e-3
+)
+
 serialize("data/Results.dat", Results)
 
 
