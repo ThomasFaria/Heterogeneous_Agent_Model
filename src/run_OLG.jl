@@ -19,7 +19,6 @@ Households = @with_kw (
                     μ = get_pop_distrib(ψ, ρ), # Population distribution
                     ϵ = get_efficiency(age_start_work, retirement_age - 1), #Efficiency index
                     γ = 2., # Constant relative risk aversion (consumption utility)
-                    Σ = 1., # Constant relative risk aversion (asset utility)
                     β = 1.011,
                     z_chain = MarkovChain([0.074 1-0.074;
                                            0.074 1-0.074], 
@@ -29,8 +28,7 @@ Households = @with_kw (
                     a_size = 100,
                     a_vals = range(a_min, a_max, length = a_size),
                     z_size = length(z_chain.state_values),
-                     u = γ == 1 ? c -> log(c) : c -> (c^(1 - γ)) / (1 - γ),
-                    # U = Σ == 1 ? a -> log(a) : a -> (a^(1 - Σ)) / (1 - Σ),
+                    u = γ == 1 ? c -> log(c) : c -> (c^(1 - γ)) / (1 - γ),
 )
 Firms = @with_kw ( 
     α = 0.35,
