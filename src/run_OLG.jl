@@ -65,25 +65,30 @@ serialize("data/Results.dat", Results)
 Results = deserialize("data/Results.dat")
 
 ## PLOTS
-θ = 0.3
+θ = 0.74
 plot_consumption_profiles(Results[θ].λ.λ_a, Results[θ].dr.Act.C
                         , Results[θ].λ.λ_r, Results[θ].dr.Ret.C
-                        , HHs)
+                        , Results[θ].q
+                        , Results[θ].Households)
 
 plot_wealth_profiles(Results[θ].λ.λ_a, Results[θ].dr.Act.A
                    , Results[θ].λ.λ_r, Results[θ].dr.Ret.A
-                   , HHs)
+                   , Results[θ].Households)
 
-plot_wealth_profiles_multiple(Results, [0.0,0.6, 0.9], HHs)
+plot_wealth_profiles_multiple(Results, [0.0,0.3,0.74, 0.9])
+plot_wealth_profiles_multiple(Results, [θ])
 
 plot_wealth_distrib(Results[θ].λ_scaled.λ_a
-                  , Results[θ].λ_scaled.λ_r, HHs)
+                  , Results[θ].λ_scaled.λ_r
+                  , Results[θ].HHs)
 
 
 plot_wealth_by_age(Results[θ].λ_scaled.λ_a
                  , Results[θ].λ_scaled.λ_r
-                 , [24, 30, 36, 40], HHs)
+                 , [24, 30, 36, 40]
+                 , Results[θ].HHs)
 
 plot_wealth_by_age(Results[θ].λ_scaled.λ_a
                  , Results[θ].λ_scaled.λ_r
-                 , [44, 50, 56, 60], HHs)
+                 , [44, 50, 56, 60]
+                 , Results[θ].HHs)

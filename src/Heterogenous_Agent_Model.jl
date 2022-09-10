@@ -634,8 +634,8 @@ function solve_equilibrium(K0::Float64, L0::Float64,  B0::Float64, Firms, Househ
             C = get_aggregate_C(λ_scaled, dr)
             Y = get_aggregate_Y(λ_scaled, dr, L0, Firm)
             W = get_aggregate_Welfare(λ, dr, HHs)
-
-            return (λ=λ, λ_scaled=λ_scaled, dr=dr, K=K1, B = B1, C = C, Y = Y, W = W, r=r, w=w, Policy=Policies)
+            q = get_dispo_income(w, HHs, Policy)
+            return (λ=λ, λ_scaled=λ_scaled, dr=dr, q=q, K=K1, B = B1, C = C, Y = Y, W = W, r=r, w=w, Policy=Policies, Households=HHs)
         end
 
         K0 = α_K * K0 + (1 - α_K) * K1
@@ -985,17 +985,25 @@ end
 ############################################### PLOTTING ###################################################
 ############################################################################################################
 
-function plot_consumption_profiles(λ_a::AxisArray{Float64,3}, C_a::AxisArray{Float64,3}, λ_r::AxisArray{Float64,2}, C_r::AxisArray{Float64,2}, Params::NamedTuple)
-    (; J) = Params
+function plot_consumption_profiles(λ_a::AxisArray{Float64,3}, C_a::AxisArray{Float64,3}, λ_r::AxisArray{Float64,2}, C_r::AxisArray{Float64,2}, q::AxisArray{Float64,2}, Params::NamedTuple)
+    (; J, j_star) = Params
     C_a = reshape(sum(sum(λ_a .* C_a, dims=2), dims=1), :, 1)
     C_r = reshape(sum(λ_r .* C_r, dims=1), :, 1)
+    Q_a = sum(dropdims(sum(λ_a, dims=1), dims=1)' .* q[Age= 1:j_star-1], dims=2)
+    Q_r = q[Age =  j_star:end, Z=:U]
+    
 
     p = plot((1:J) .+ 20
         , vcat(C_a, C_r)
-        , label=nothing
+        , label=L"Consumption"
         )
+    
+    plot!(p
+    , (1:J) .+ 20
+    , vcat(Q_a, Q_r)
+    , label=L"Income")
+
     xlabel!(L"Age")
-    ylabel!(L"Consumption")
 
     return p
 end
@@ -1015,9 +1023,10 @@ function plot_wealth_profiles(λ_a::AxisArray{Float64,3}, A_a::AxisArray{Float64
 
     return p
 end
+export plot_wealth_profiles
 
-function plot_wealth_profiles_multiple(Results::Dict, Policies::Vector{Float64}, Params::NamedTuple)
-    (; J) = Params
+function plot_wealth_profiles_multiple(Results::Dict, Policies::Vector{Float64})
+    (; J) = Results.Households
     p = plot()
 
     for θ ∈ Policies
