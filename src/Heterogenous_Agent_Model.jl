@@ -985,13 +985,19 @@ end
 ############################################### PLOTTING ###################################################
 ############################################################################################################
 
-function plot_consumption_profiles(λ_a::AxisArray{Float64,3}, C_a::AxisArray{Float64,3}, λ_r::AxisArray{Float64,2}, C_r::AxisArray{Float64,2}, q::AxisArray{Float64,2}, Params::NamedTuple)
-    (; J, j_star) = Params
+function plot_consumption_profiles(λ_a::AxisArray{Float64,3}, C_a::AxisArray{Float64,3}, λ_r::AxisArray{Float64,2}, C_r::AxisArray{Float64,2}, w::Float64, Params::NamedTuple, Policy::NamedTuple)
+    (; J, j_star, h, ϵ) = Params
+    (; ξ, θ) = Policy
+
     C_a = reshape(sum(sum(λ_a .* C_a, dims=2), dims=1), :, 1)
     C_r = reshape(sum(λ_r .* C_r, dims=1), :, 1)
-    Q_a = sum(dropdims(sum(λ_a, dims=1), dims=1)' .* q[Age= 1:j_star-1], dims=2)
-    Q_r = q[Age =  j_star:end, Z=:U]
-    
+
+    w_e = w * h * ϵ
+    w_u = ξ .* w_e 
+    b = θ * mean(w_e)
+
+    Y_a = sum(dropdims(sum(λ_a, dims=1), dims=1)' .* hcat(w_u, w_e), dims=2)
+    Y_r = [b for i in j_star:J]
 
     p = plot((1:J) .+ 20
         , vcat(C_a, C_r)
@@ -1000,13 +1006,14 @@ function plot_consumption_profiles(λ_a::AxisArray{Float64,3}, C_a::AxisArray{Fl
     
     plot!(p
     , (1:J) .+ 20
-    , vcat(Q_a, Q_r)
-    , label=L"Income")
+    , vcat(Y_a, Y_r)
+    , label=L"Pre-tax income")
 
     xlabel!(L"Age")
 
     return p
 end
+
 export plot_consumption_profiles
 
 function plot_wealth_profiles(λ_a::AxisArray{Float64,3}, A_a::AxisArray{Float64,3}, λ_r::AxisArray{Float64,2}, A_r::AxisArray{Float64,2}, Params::NamedTuple)
@@ -1036,7 +1043,7 @@ function plot_wealth_profiles_multiple(Results::Dict, Policies::Vector{Float64})
         plot!(p
             , (1:J) .+ 20
             , vcat(A_a, A_r)
-            , label= @sprintf("θ = %.1f", θ)
+            , label= @sprintf("θ = %.2f", θ)
             )
     end
 
