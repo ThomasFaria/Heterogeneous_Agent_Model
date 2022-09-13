@@ -1033,10 +1033,10 @@ end
 export plot_wealth_profiles
 
 function plot_wealth_profiles_multiple(Results::Dict, Policies::Vector{Float64})
-    (; J) = Results.Households
     p = plot()
 
     for θ ∈ Policies
+        (; J) = Results[θ].Households
         A_a = reshape(sum(sum(Results[θ].λ.λ_a .* Results[θ].dr.Act.A, dims=2), dims=1), :, 1)
         A_r = reshape(sum(Results[θ].λ.λ_r .* Results[θ].dr.Ret.A, dims=1), :, 1)
 
