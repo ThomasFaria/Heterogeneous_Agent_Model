@@ -32,8 +32,8 @@ Households = @with_kw (
 )
 Firms = @with_kw ( 
     α = 0.35,
-    Ω = 1.587, #1.3193,
-    δ = 0.0294,
+    Ω = 1.578, #1.3193,
+    δ = 0.029,
 )
 
 Firm = Firms();
@@ -86,7 +86,7 @@ plot_wealth_profiles(Results[θ].λ.λ_a, Results[θ].dr.Act.A
                    , Results[θ].λ.λ_r, Results[θ].dr.Ret.A
                    , Results[θ].Households)
 
-plot_wealth_profiles_multiple(Results, [0.0,0.3,0.74, 0.9])
+plot_wealth_profiles_multiple(Results, [0.2, 0.4,0.74, 0.80])
 plot_wealth_profiles_multiple(Results, [θ])
 
 plot_wealth_distrib(Results[θ].λ_scaled.λ_a
@@ -96,12 +96,12 @@ plot_wealth_distrib(Results[θ].λ_scaled.λ_a
 
 plot_wealth_by_age(Results[θ].λ_scaled.λ_a
                  , Results[θ].λ_scaled.λ_r
-                 , [24, 30, 36, 40]
+                 , [5, 24, 30, 43]
                  , Results[θ].Households)
 
 plot_wealth_by_age(Results[θ].λ_scaled.λ_a
                  , Results[θ].λ_scaled.λ_r
-                 , [44, 50, 56, 60]
+                 , [44, 56, 60, 65]
                  , Results[θ].Households)
 
 
