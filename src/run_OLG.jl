@@ -24,7 +24,7 @@ Households = @with_kw (
                                            0.074 1-0.074], 
                                         [:U; :E]),
                     a_min = 1e-10,
-                    a_max = 15.,
+                    a_max = 25.,
                     a_size = 100,
                     a_vals = range(a_min, a_max, length = a_size),
                     z_size = length(z_chain.state_values),
@@ -32,8 +32,8 @@ Households = @with_kw (
 )
 Firms = @with_kw ( 
     α = 0.35,
-    Ω = 1.75, #1.3193,
-    δ = 0.07,
+    Ω = 1.587, #1.3193,
+    δ = 0.0294,
 )
 
 Firm = Firms();
@@ -54,13 +54,14 @@ for θ ∈ range(0,1,11)
     
 end
 
+θ = 0.74
 Results[θ] = solve_equilibrium(
     4., 
     (1-0.074) * HHs.h * sum(HHs.μ[1:HHs.j_star-1] .* HHs.ϵ),
     0.5,
     Firm,
     HHs,
-    Policy(θ = 0.74), 
+    Policy(θ = θ), 
     η_tol_K=1e-3,
     η_tol_B=1e-3
 )
