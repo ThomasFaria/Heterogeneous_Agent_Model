@@ -1,4 +1,4 @@
-using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Serialization, StatsPlots, AxisArrays, Printf
+using Heterogenous_Agent_Model, QuantEcon, LaTeXStrings, Parameters, Plots, Serialization, StatsPlots, AxisArrays, Printf, LaTeXTabulars
 
 Policy = @with_kw (
                     ξ = 0.65,
@@ -103,3 +103,26 @@ plot_wealth_by_age(Results[θ].λ_scaled.λ_a
                  , [44, 50, 56, 60]
                  , Results[θ].Households)
 
+
+
+w = hcat([θ for θ in keys(Results)],
+[Results[θ].Policy.τ_ssc for θ in keys(Results)],
+[Results[θ].w for θ in keys(Results)],
+[Results[θ].r for θ in keys(Results)],
+[Results[θ].C for θ in keys(Results)],
+[Results[θ].K for θ in keys(Results)],
+[Results[θ].Y for θ in keys(Results)],
+[Results[θ].B for θ in keys(Results)],
+[Results[θ].W for θ in keys(Results)])
+
+w = round.(w, digits=3)
+w = w[sortperm(w[:, 1]), :]
+
+latex_tabular("table.tex",
+              Tabular("lllllllll"),
+              [Rule(:top),
+             [L"\theta", "Tax Rate", "Wage", "Return to Capital", "Consumption", "Capital", "Output", "Welfare"],
+               w,
+               Rule(:bottom)])
+
+               q = Policy(θ=0.3) 
