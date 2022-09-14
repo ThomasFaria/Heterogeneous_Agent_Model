@@ -73,6 +73,7 @@ serialize("data/Results.dat", Results)
 ######################################################
 
 Results = deserialize("data/Results.dat")
+path = "/Users/thomas/Documents/Cloud/2022_5A_ENS_ENSAE/Memoire/MasterThesis_HA/docu/Draft/Figures/"
 
 ## PLOTS
 θ = 0.74
@@ -81,30 +82,35 @@ p=plot_consumption_profiles(Results[θ].λ.λ_a, Results[θ].dr.Act.C
                         , Results[θ].w
                         , Results[θ].Households
                         , Results[θ].Policy)
-savefig(p,"consum_profile.pdf")
+savefig(plot(p, size = (455.24, 250)), path * "consum_profile.pdf")
 
 
 plot_wealth_profiles(Results[θ].λ.λ_a, Results[θ].dr.Act.A
                    , Results[θ].λ.λ_r, Results[θ].dr.Ret.A
                    , Results[θ].Households)
 
-plot_wealth_profiles_multiple(Results, [0.2, 0.4,0.74, 0.80])
+p=plot_wealth_profiles_multiple(Results, [0., 0.3,0.74, 0.90])
+savefig(plot(p, size = (455.24, 250)), path * "wealth_profiles.pdf")
+
 plot_wealth_profiles_multiple(Results, [θ])
 
-plot_wealth_distrib(Results[θ].λ_scaled.λ_a
+p=plot_wealth_distrib(Results[θ].λ_scaled.λ_a
                   , Results[θ].λ_scaled.λ_r
                   , Results[θ].Households)
+savefig(plot(p, size = (455.24, 250), xlims=(0,15)), path * "wealth_distrib.pdf")
 
 
-plot_wealth_by_age(Results[θ].λ_scaled.λ_a
+p=plot_wealth_by_age(Results[θ].λ_scaled.λ_a
                  , Results[θ].λ_scaled.λ_r
-                 , [5, 24, 30, 43]
+                 , [5, 15, 25, 43]
                  , Results[θ].Households)
+savefig(plot(p, size = (455.24, 250), xlims=(0,15)), path * "wealth_workers.pdf")
 
-plot_wealth_by_age(Results[θ].λ_scaled.λ_a
+p=plot_wealth_by_age(Results[θ].λ_scaled.λ_a
                  , Results[θ].λ_scaled.λ_r
                  , [44, 56, 60, 65]
                  , Results[θ].Households)
+p=savefig(plot(p, size = (455.24, 250), xlims=(0,15)), path * "wealth_retired.pdf")
 
 
 
@@ -128,6 +134,3 @@ latex_tabular("table.tex",
              Rule(),
                w,
                Rule()])
-
-
-               q = Policy(θ=0.3) 
