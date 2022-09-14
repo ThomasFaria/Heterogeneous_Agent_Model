@@ -433,7 +433,7 @@ end
 export r_to_w
 
 function get_SSC_rate(λ::NamedTuple, w::Float64, Params::NamedTuple, Policy::NamedTuple)
-    (; j_star, h, ϵ) = Params
+    (; h, ϵ) = Params
 
     b = get_soc_sec_benefit(w, Params, Policy)
 
@@ -1001,13 +1001,13 @@ function plot_consumption_profiles(λ_a::AxisArray{Float64,3}, C_a::AxisArray{Fl
 
     p = plot((1:J) .+ 20
         , vcat(C_a, C_r)
-        , label=L"Consumption"
+        , label="Consumption", legend=:bottomright
         )
     
     plot!(p
     , (1:J) .+ 20
     , vcat(Y_a, Y_r)
-    , label=L"Pre-tax income")
+    , label="Pre-tax income", legend=:bottomright)
 
     xlabel!(L"Age")
 

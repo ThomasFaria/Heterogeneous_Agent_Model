@@ -76,11 +76,13 @@ Results = deserialize("data/Results.dat")
 
 ## PLOTS
 θ = 0.74
-plot_consumption_profiles(Results[θ].λ.λ_a, Results[θ].dr.Act.C
+p=plot_consumption_profiles(Results[θ].λ.λ_a, Results[θ].dr.Act.C
                         , Results[θ].λ.λ_r, Results[θ].dr.Ret.C
                         , Results[θ].w
                         , Results[θ].Households
                         , Results[θ].Policy)
+savefig(p,"consum_profile.pdf")
+
 
 plot_wealth_profiles(Results[θ].λ.λ_a, Results[θ].dr.Act.A
                    , Results[θ].λ.λ_r, Results[θ].dr.Ret.A
@@ -121,9 +123,11 @@ w = w[sortperm(w[:, 1]), :]
 
 latex_tabular("table.tex",
               Tabular("lllllllll"),
-              [Rule(:top),
-             [L"\theta", "Tax Rate", "Wage", "Return to Capital", "Consumption", "Capital", "Output", "Welfare"],
+              [Rule(),
+             [L"\theta", "Tax Rate", "w", "r", "Consumption", "Capital", "Output", "Bequest", "Welfare"],
+             Rule(),
                w,
-               Rule(:bottom)])
+               Rule()])
+
 
                q = Policy(θ=0.3) 
