@@ -1077,13 +1077,13 @@ function plot_wealth_by_age(λ_a::AxisArray{Float64,3}, λ_r::AxisArray{Float64,
             bar!(p
             , a_vals
             , sum(λ_a[Age = j], dims=2)
-            , label= @sprintf("%.0f ans", true_age)
+            , label= @sprintf("%.0f years", true_age)
             )
         else
             bar!(p
             , a_vals
             , λ_r[Age = j - (j_star-1)]
-            , label= @sprintf("%.0f ans", true_age)
+            , label= @sprintf("%.0f years", true_age)
             )
 
         end
